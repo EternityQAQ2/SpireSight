@@ -1,0 +1,48 @@
+{
+  "state_type": "monster",
+  "battle": {
+    "round": 1,
+    "turn": "player",
+    "is_play_phase": true,
+    "enemies": [
+      {
+        "entity_id": "NIBBIT_0",
+        "combat_id": 1,
+        "name": "小啃兽",
+        "hp": 42,
+        "max_hp": 42,
+        "block": 0,
+        "status": [],
+        "intents": [
+          {"type": "Attack", "label": "12", "title": "攻势", "description": "造成12点伤害。"}
+        ]
+      }
+    ]
+  },
+  "run": {"act": 1, "floor": 1, "ascension": 0},
+  "player": {
+    "character": "铁甲战士",
+    "hp": 80,
+    "max_hp": 80,
+    "block": 0,
+    "energy": 3,
+    "max_energy": 3,
+    "hand": [
+      {"id": "STRIKE_IRONCLAD", "name": "打击", "type": "Attack", "cost": "1", "description": "造成6点伤害。", "index": 0, "target_type": "AnyEnemy", "can_play": true},
+      {"id": "BASH", "name": "痛击", "type": "Attack", "cost": "2", "description": "造成8点伤害。给予2层易伤。", "index": 1, "target_type": "AnyEnemy", "can_play": true},
+      {"id": "DEFEND_IRONCLAD", "name": "防御", "type": "Skill", "cost": "1", "description": "获得5点格挡。", "index": 2, "target_type": "Self", "can_play": true}
+    ],
+    "draw_pile": [
+      {"name": "防御", "cost": "1", "description": "获得5点格挡。"},
+      {"name": "防御", "cost": "1", "description": "获得5点格挡。"}
+    ],
+    "discard_pile": [],
+    "exhaust_pile": [],
+    "gold": 99,
+    "status": [],
+    "relics": [{"id": "BURNING_BLOOD", "name": "燃烧之血", "description": "战斗结束回复6点生命。"}],
+    "potions": [],
+    "max_potion_slots": 3
+  }
+}
+

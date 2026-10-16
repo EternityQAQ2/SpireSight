@@ -1,0 +1,124 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build output
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test, type-checker, and coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Downloaded base models and Hugging Face caches
+MiniCPM5_*/
+models/
+.cache/
+hf_cache/
+huggingface/
+**/hub/.locks/
+**/xet/logs/
+
+# Model weights and training checkpoints
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.gguf
+checkpoint-*/
+checkpoints/
+
+# Experiment trackers and training logs
+logs/
+runs/
+wandb/
+mlruns/
+lightning_logs/
+tensorboard/
+
+# Runtime session records and temporary output
+sessions/
+recordings/
+replays/
+tmp/
+temp/
+*.log
+*.pid
+
+# Local datasets. Keep manifests and optional placeholders versioned.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/chroma/*
+!data/chroma/.gitkeep
+data/downloads/*
+!data/downloads/.gitkeep
+
+# Generated model adapters and evaluation reports
+artifacts/adapters/*
+!artifacts/adapters/.gitkeep
+artifacts/checkpoints/*
+!artifacts/checkpoints/.gitkeep
+artifacts/reports/*
+!artifacts/reports/.gitkeep
+
+# Chroma and local database files outside data/chroma
+chroma_db/
+chroma.sqlite3
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Keep dependency lock files, source, manifests, and test fixtures tracked.
+!uv.lock
+!data/manifests/
+!data/manifests/**
+!tests/fixtures/
+!tests/fixtures/**

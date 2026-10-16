@@ -1,0 +1,17 @@
+api:
+  base_url: http://localhost:15526
+  timeout_seconds: 5
+runtime:
+  poll_interval_seconds: 0.5
+  stable_reads: 2
+  output_language: zh-CN
+model:
+  name: openbmb/MiniCPM5-2B
+  max_new_tokens: 384
+retrieval:
+  top_k: 6
+  chroma_path: data/chroma
+  fallback_path: data/knowledge.jsonl
+recording:
+  directory: recordings
+
