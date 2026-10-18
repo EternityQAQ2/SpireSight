@@ -1,3 +1,9 @@
+https://sts2.huijiwiki.com/wiki/%E9%A6%96%E9%A1%B5
+https://github.com/DarkArcZ/STS2MCP 优化 v0.111版本
+https://github.com/Gennadiyev/STS2MCP
+https://huggingface.co/openbmb/MiniCPM5-2B
+
+
 ```C++
 src/sts2_advisor/
   api.py          # 只读访问 STS2MCP /singleplayer
@@ -46,7 +52,7 @@ tests/
 }
 ```
 推荐过程：
-1. 用 --backend rule --watch 或当前模型运行，自动记录局面。
+1. 用 --backend rule --watch 或当前模型运行，自动记录局面。```.venv\\Scripts\\python.exe main.py --watch --backend rule```
 2. 人工审核每条建议，修正推荐动作和理由。
 3. 把审核结果写到 data/annotations.jsonl。
 4. 使用 training/build_sft.py 构建 train/validation/test。
