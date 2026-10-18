@@ -23,6 +23,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-interval", type=float, default=0.5)
     parser.add_argument("--stable-reads", type=int, default=2)
     parser.add_argument("--backend", choices=("rule", "transformers"), default="rule")
+    parser.add_argument(
+        "--device", choices=("auto", "cpu", "cuda", "mps"), default="auto",
+        help="模型推理设备；auto 按 CUDA、Apple MPS、CPU 顺序选择",
+    )
     parser.add_argument("--model", default="openbmb/MiniCPM5-2B")
     parser.add_argument("--model-cache", type=Path, default=PROJECT_ROOT / "MiniCPM5_2B")
     parser.add_argument("--max-new-tokens", type=int, default=384)
@@ -62,11 +66,14 @@ def main(argv: list[str] | None = None) -> int:
     retriever = create_retriever(args.rag, args.chroma_path, args.knowledge_file)
     if args.backend == "transformers":
         try:
-            backend = TransformersAdvisor(args.model, args.model_cache, args.max_new_tokens)
+            backend = TransformersAdvisor(
+                args.model, args.model_cache, args.max_new_tokens, device=args.device
+            )
         except Exception as exc:
             print(f"模型加载失败：{exc}", file=sys.stderr)
             return 1
         fallback = RuleAdvisor()
+        print(f"模型推理设备：{backend.device}")
     else:
         backend = RuleAdvisor()
         fallback = None

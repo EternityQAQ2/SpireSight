@@ -12,6 +12,14 @@
 
 构建数据：
 
+macOS（zsh / bash）：
+
+```bash
+.venv/bin/python training/build_sft.py recordings/*.jsonl --annotations data/annotations.jsonl
+```
+
+Windows（PowerShell）：
+
 ```powershell
 .venv\Scripts\python.exe training\build_sft.py recordings\*.jsonl --annotations data\annotations.jsonl
 ```
@@ -27,6 +35,8 @@
 chosen 和 rejected 必须都是当前局面的合法候选。明显非法答案不适合作为主要 rejected。
 
 ## 训练
+
+macOS 的推理与数据准备见 [macOS 使用说明](../docs/macos.md)。本次适配未验证 macOS 上的 SFT/DPO 或 QLoRA；以下训练命令保留原有服务器/Windows 工作流。
 
 安装训练依赖后先 SFT，再 DPO：
 
