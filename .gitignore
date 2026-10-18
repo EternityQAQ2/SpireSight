@@ -1,5 +1,6 @@
-#
-tools/
+# Wiki export snapshots are reproducible local inputs. Keep the scripts in
+# tools/ tracked; ignore only downloaded source data.
+tools/sts_raw_data/
 
 # Python bytecode and caches
 __pycache__/
