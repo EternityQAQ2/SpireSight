@@ -4,6 +4,7 @@
 
 ```text
 GET http://localhost:15526/api/v1/singleplayer
+curl -s http://localhost:15526/api/v1/singleplayer
 ```
 
 它不会发送 POST 请求，也不会替玩家操作游戏。
@@ -20,6 +21,35 @@ GET http://localhost:15526/api/v1/singleplayer
 - 将局面、证据和建议写入 JSONL，但默认标记 `training_consent: false`。
 
 ## 快速开始
+
+### macOS（zsh / bash）
+
+需要 Python 3.11+；macOS 自带的 `/usr/bin/python3` 可能版本过低。已安装 [uv](https://docs.astral.sh/uv/) 后，在项目目录执行：
+
+```bash
+uv sync --python 3.13 --locked
+.venv/bin/python main.py --backend rule
+.venv/bin/python main.py --watch --backend rule
+.venv/bin/python main.py --dump-context
+```
+
+先在游戏中安装并启动 STS2MCP，确认 `localhost:15526` 可访问。规则后端不需要 PyTorch、模型权重或 Chroma。
+
+Apple Silicon 本地模型：
+
+```bash
+uv sync --python 3.13 --locked --extra model
+.venv/bin/python main.py --watch --backend transformers \
+  --model openbmb/MiniCPM5-2B --model-cache MiniCPM5_2B --device auto
+```
+
+`auto` 按 CUDA → Apple MPS → CPU 选择；可用 `--device mps` 或 `--device cpu` 指定。MPS 使用 float16，CPU 使用 float32。模型仍只从本地加载，需提前准备完整文件；`--model` 可直接指定本地模型目录，`--model-cache` 则指定 Hugging Face 缓存根目录（模型缓存位于其 `hub/` 子目录）。
+
+完整安装、攻略入库、测试与故障排查见 [macOS 使用说明](docs/macos.md)。
+
+Windows 与 macOS 共用同一代码；保留 Windows PowerShell 命令、CUDA 自动映射和现有缓存环境变量配置。已设置的 `HF_HOME`、`HF_HUB_CACHE`、`HF_XET_CACHE` 不会被覆盖，其中 `HF_HUB_CACHE` 优先于 `--model-cache` 的默认 hub 路径。
+
+### Windows（PowerShell）
 
 在项目目录运行一次只读建议：
 
@@ -91,6 +121,19 @@ $env:PYTHONPATH="src"
 Chroma 默认 embedding 可能在首次入库时下载模型。正式使用前应固定 embedding 模型及其版本，并把版本写入数据 manifest。
 
 ## 测试
+
+macOS：
+
+```bash
+uv sync --python 3.13 --locked --extra dev
+PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m pytest -q
+.venv/bin/python test_api.py
+```
+
+单元与集成测试使用本机临时 HTTP 服务，不需要游戏；`test_api.py` 需要真实游戏 API。安装 `model` 可选依赖后，测试还会用随机初始化的微型模型离线验证 CPU/MPS 加载与生成，不下载 MiniCPM 权重。
+
+Windows：
 
 ```powershell
 $env:PYTHONPATH="src"

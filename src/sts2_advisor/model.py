@@ -13,6 +13,24 @@ class AdvisorBackend(Protocol):
     def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice: ...
 
 
+def select_device(torch, requested: str = "auto") -> str:
+    """Resolve an inference device without requiring PyTorch for the rule backend."""
+    if requested not in {"auto", "cpu", "cuda", "mps"}:
+        raise ValueError(f"不支持的设备：{requested}")
+    if requested == "cpu":
+        return "cpu"
+    mps = getattr(torch.backends, "mps", None)
+    available = {
+        "cuda": torch.cuda.is_available(),
+        "mps": mps is not None and mps.is_available(),
+    }
+    if requested == "auto":
+        return next((device for device in ("cuda", "mps") if available[device]), "cpu")
+    if not available[requested]:
+        raise RuntimeError(f"设备 {requested} 不可用；请检查 PyTorch 与硬件，或使用 --device cpu。")
+    return requested
+
+
 class RuleAdvisor:
     """Deterministic fallback used for pipeline validation and model failures."""
 
@@ -36,8 +54,10 @@ class TransformersAdvisor:
         model_name: str,
         cache_root: Path | None = None,
         max_new_tokens: int = 384,
+        device: str = "auto",
     ) -> None:
         if cache_root:
+            cache_root = cache_root.expanduser()
             os.environ.setdefault("HF_HOME", str(cache_root))
             os.environ.setdefault("HF_HUB_CACHE", str(cache_root / "hub"))
             os.environ.setdefault("HF_XET_CACHE", str(cache_root / "xet"))
@@ -47,19 +67,25 @@ class TransformersAdvisor:
 
         self.torch = torch
         self.max_new_tokens = max_new_tokens
-        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+        self.device = select_device(torch, device)
+        dtype = torch.float32 if self.device == "cpu" else torch.float16
+        cache_dir = os.environ.get("HF_HUB_CACHE")
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             trust_remote_code=True,
             local_files_only=True,
+            cache_dir=cache_dir,
         )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             trust_remote_code=True,
             local_files_only=True,
+            cache_dir=cache_dir,
             dtype=dtype,
-            device_map="auto" if torch.cuda.is_available() else None,
+            device_map="auto" if self.device == "cuda" else None,
         )
+        if self.device != "cuda":
+            self.model.to(self.device)
         self.model.eval()
 
     def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice:
