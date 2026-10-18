@@ -69,9 +69,10 @@ tests/
 - 事件与 Boss 遗物。
 
 ### Chroma
+macOS 的安装及入库命令见 [macOS 使用说明](macos.md)。下列为 Windows PowerShell 示例；先进入当前项目目录。
+
 要启用 Chroma：
 ```POWERSHELL
-cd H:\Visualstudiotable\SlayTheSpire_Instructs
 uv sync --extra rag
 ```
 然后把攻略入库：
