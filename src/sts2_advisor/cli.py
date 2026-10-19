@@ -16,10 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="《杀戮尖塔2》只读控制台建议器")
+    parser = argparse.ArgumentParser(description="《杀戮尖塔2》控制台建议器与自动操作")
     parser.add_argument("--base-url", default="http://localhost:15526")
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--watch", action="store_true", help="持续监听游戏决策状态")
+    parser.add_argument("--auto-act", action="store_true", help="自动向游戏发送推荐动作；搭配 --watch 持续操作")
     parser.add_argument("--poll-interval", type=float, default=0.5)
     parser.add_argument("--stable-reads", type=int, default=2)
     parser.add_argument("--backend", choices=("rule", "transformers"), default="rule")
@@ -86,6 +87,7 @@ def main(argv: list[str] | None = None) -> int:
         backend_name=args.backend,
         fallback_backend=fallback,
         top_k=args.top_k,
+        auto_act=args.auto_act,
     )
     try:
         if args.watch:

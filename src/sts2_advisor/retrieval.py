@@ -1,10 +1,12 @@
 from __future__ import annotations
 '''
- Chroma / JSONL 知识检索
+ Chroma / JSONL 攻略与 SQLite 事实检索
 '''
 import json
 import math
 import re
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -95,7 +97,94 @@ class ChromaRetriever:
         return evidences
 
 
-def create_retriever(mode: str, chroma_path: Path, fallback_path: Path) -> Retriever:
+class SqliteFactsRetriever:
+    """按局面中的实体 ID/名称只读查询事实与效果交互，并保留已有攻略。"""
+
+    TABLES = (
+        "cards", "relics", "potions", "powers", "monsters", "events",
+        "enchantments", "afflictions", "keywords", "intents",
+    )
+
+    def __init__(self, path: Path, fallback: Retriever | None = None) -> None:
+        self.path = path
+        self.fallback = fallback or NullRetriever()
+
+    def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
+        if top_k <= 0:
+            return []
+        ids: set[str] = set()
+        names: set[str] = set()
+
+        def collect(value):
+            if isinstance(value, dict):
+                entity_id = (
+                    value.get("id") or value.get("event_id")
+                    or re.sub(r"_\d+$", "", str(value.get("entity_id", "")))
+                )
+                name = value.get("name") or value.get("event_name")
+                upgraded = value.get("is_upgraded", False)
+                if isinstance(entity_id, str) and entity_id:
+                    entity_id = entity_id.lower()
+                    if upgraded and not entity_id.endswith("_upgrade"):
+                        entity_id += "_upgrade"
+                    ids.add(entity_id)
+                if isinstance(name, str) and name:
+                    names.add(name + "+" if upgraded and not name.endswith("+") else name)
+                for item in value.values():
+                    collect(item)
+            elif isinstance(value, list):
+                for item in value:
+                    collect(item)
+
+        collect(context.player)
+        collect(context.situation)
+        identifiers, labels = sorted(ids), sorted(names)
+        id_slots = ",".join("?" for _ in identifiers) or "NULL"
+        name_slots = ",".join("?" for _ in labels) or "NULL"
+        facts: list[Evidence] = []
+        with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+            connection.row_factory = sqlite3.Row
+            for table in self.TABLES:
+                rows = connection.execute(
+                    f"SELECT * FROM {table} WHERE id COLLATE NOCASE IN ({id_slots}) "
+                    f"OR name IN ({name_slots}) ORDER BY id",
+                    identifiers + labels,
+                ).fetchall()
+                # 同名卡牌可能属于不同角色，已有准确 ID 时优先使用对应记录。
+                exact_names = {row["name"] for row in rows if row["id"].lower() in ids}
+                for row in rows:
+                    if row["id"].lower() not in ids and row["name"] in exact_names:
+                        continue
+                    names.add(row["name"])
+                    text = json.dumps({
+                        key: row[key] for key in row.keys()
+                        if key != "description_wiki" and row[key] is not None
+                    }, ensure_ascii=False)
+                    facts.append(Evidence(
+                        f"sqlite:{table}:{row['id']}", text, f"灰机 Wiki：{row['name']}",
+                        metadata={"table": table},
+                    ))
+            # 交互说明的关联页面可出现在名称、卡牌说明或状态说明中。
+            query = json.dumps(context.to_dict(), ensure_ascii=False) + " " + " ".join(sorted(names))
+            rows = connection.execute(
+                "SELECT DISTINCT i.id, i.description FROM interactions i "
+                "JOIN interaction_pages p ON p.interaction_id = i.id "
+                "WHERE instr(?, p.page_name) > 0 ORDER BY i.id LIMIT ?", (query, top_k),
+            ).fetchall()
+            interactions = [Evidence(
+                f"sqlite:interactions:{row['id']}", row["description"], "灰机 Wiki：效果交互",
+                metadata={"table": "interactions"},
+            ) for row in rows]
+
+        facts = interactions + facts
+        guides = self.fallback.retrieve(context, top_k)
+        guide_count = min(len(guides), top_k // 2) if facts else len(guides)
+        return (guides[:guide_count] + facts + guides[guide_count:])[:top_k]
+
+
+def create_retriever(
+    mode: str, chroma_path: Path, fallback_path: Path, *, facts_path: Path | None = None,
+) -> Retriever:
     if mode == "none":
         return NullRetriever()
     if mode == "json":
@@ -103,13 +192,19 @@ def create_retriever(mode: str, chroma_path: Path, fallback_path: Path) -> Retri
     if mode == "chroma":
         return ChromaRetriever(chroma_path)
     if mode == "auto":
+        retriever: Retriever | None = None
         try:
-            retriever = ChromaRetriever(chroma_path)
-            if retriever.collection.count() > 0:
-                return retriever
+            chroma = ChromaRetriever(chroma_path)
+            if chroma.collection.count() > 0:
+                retriever = chroma
         except RuntimeError:
             pass
-        return JsonKnowledgeRetriever(fallback_path)
+        if retriever is None:
+            retriever = JsonKnowledgeRetriever(fallback_path)
+        path = facts_path if facts_path is not None else (
+            Path(__file__).resolve().parents[2] / "data/sts2_facts.sqlite3"
+        )
+        return SqliteFactsRetriever(path, retriever) if path.is_file() else retriever
     raise ValueError(f"未知检索模式: {mode}")
 
 
