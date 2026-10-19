@@ -1,13 +1,14 @@
 # STS2 Advisor
 
-基于 STS2MCP 的《杀戮尖塔 2》只读控制台建议器。程序只访问：
+基于 STS2MCP 的《杀戮尖塔 2》控制台建议器。默认只读取：
 
 ```text
 GET http://localhost:15526/api/v1/singleplayer
 curl -s http://localhost:15526/api/v1/singleplayer
 ```
 
-它不会发送 POST 请求，也不会替玩家操作游戏。
+添加 `--auto-act` 后会通过 POST 自动执行推荐：`.venv/bin/python main.py --watch --auto-act --backend transformers`。
+动作发送与执行逻辑集中在 [`src/sts2_advisor/action.py`](src/sts2_advisor/action.py)。
 
 ## 当前能力
 
