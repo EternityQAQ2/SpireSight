@@ -92,3 +92,51 @@ $env:PYTHONPATH="src"
 ```aiignore
 .venv\Scripts\python.exe main.py --watch --backend rule --rag chroma
 ```
+
+### 远程api优化路径
+核心逻辑位于 [planning.py](H:/Visualstudiotable/SlayTheSpire_Instructs/src/sts2_advisor/planning.py:20)：
+
+- 模型通过 `plan_candidate_ids` 返回最多 8 步短计划。
+- 战斗中允许连续规划出牌和结束回合。
+- 商店中允许按当前金币规划多个购买。
+- 奖励界面允许连续领取确定性奖励。
+- 地图、事件、选牌等不确定场景仍然一步一问。
+
+每次状态变化都会验证：
+
+- 手牌是否只移除了计划中的牌
+- 是否出现额外抽牌、弃牌、升级或费用变化
+- 下一张牌是否仍可打出、目标是否仍存在
+- 商店商品是否按计划消失
+- 金币减少量是否等于已购买商品总价
+- 奖励领取后是否进入选牌等新界面
+
+验证通过时输出：
+
+```text
+复用上一轮短计划，本次未请求模型。
+
+计划：痛击 -> 打击 -> 结束回合
+```
+
+验证失败则废弃计划，重新请求模型。手牌、商店和奖励索引变化会自动按“动作类型 + 名称 + 目标”重新匹配。即使你连续手动执行多步、监听器没有观察到中间状态，也能识别已完成的计划前缀。
+
+缓存方面：
+
+- 固定规则和 JSON 输出结构全部移入稳定的 system prompt 前缀。
+- 删除了每次动态重复发送的 JSON Schema。
+- 短计划直接减少 API 请求次数。
+- 日志新增 `cache_hit_tokens`、`cache_miss_tokens` 和 `plan_cache_hit`。
+
+首次使用新提示词通常是冷缓存，后续请求才会开始命中。DeepSeek 后台的历史比例是累计值，建议以新日志中的单次请求数据判断效果。
+
+直接运行：
+
+```powershell
+.venv\Scripts\python.exe main.py --watch --backend openai
+```
+
+加上 `--auto-act` 后，也是一项一项执行，每一步执行前都会重新读取并验证状态，不会把整串动作无检查地一次性发给游戏。
+
+完整测试结果：61 项通过，2 项因当前机器没有 Apple MPS 而跳过。未调用真实 DeepSeek API，因此没有消耗额度。
+

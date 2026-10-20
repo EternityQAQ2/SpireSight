@@ -54,6 +54,7 @@ class Advice:
     alternative_ids: list[str] = field(default_factory=list)
     evidence_ids: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    plan_candidate_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
