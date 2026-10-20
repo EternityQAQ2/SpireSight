@@ -8,11 +8,16 @@ from .action import ActionExecutor
 from .api import Sts2ApiError, Sts2RestClient
 from .domain import Advice
 from .model import AdvisorBackend, RuleAdvisor
+from .logging_config import get_logger
 from .normalize import build_decision_context
+from .planning import ActivePlan
 from .recording import SessionRecorder
 from .render import render_console
 from .retrieval import Retriever
 from .validation import AdviceValidationError, validate_advice
+
+
+logger = get_logger("service")
 
 
 class AdvisorService:
@@ -39,6 +44,7 @@ class AdvisorService:
         self.action_executor = ActionExecutor(client, output=output) if auto_act else None
         self.output = output
         self.last_decision_id: str | None = None
+        self.active_plan: ActivePlan | None = None
 
     def run_once(self, *, force: bool = False) -> bool:
         raw_state = self.client.get_singleplayer_state()
@@ -79,16 +85,40 @@ class AdvisorService:
             time.sleep(poll_interval)
 
     def _process(self, raw_state: dict, context) -> Advice:
+        if self.active_plan is not None:
+            cached = self.active_plan.advance(context)
+            if cached is not None:
+                evidence = self.active_plan.evidence
+                advice = validate_advice(cached, context, evidence)
+                logger.info(
+                    "plan_cache_hit decision_id=%s remaining_steps=%s",
+                    context.decision_id, len(advice.plan_candidate_ids),
+                )
+                self.output("复用上一轮短计划，本次未请求模型。")
+                return self._deliver(
+                    raw_state, context, evidence, advice, "plan-cache"
+                )
+            logger.info("plan_cache_invalidated decision_id=%s", context.decision_id)
+            self.active_plan = None
+
         evidence = self.retriever.retrieve(context, self.top_k)
         backend_name = self.backend_name
         try:
             advice = validate_advice(self.backend.advise(context, evidence), context, evidence)
         except (AdviceValidationError, ValueError, RuntimeError) as exc:
+            logger.exception(
+                "advisor_fallback backend=%s decision_id=%s error_type=%s",
+                self.backend_name, context.decision_id, type(exc).__name__,
+            )
             if self.fallback_backend is None:
                 raise
             backend_name = "rule-fallback"
             self.output(f"模型输出不可用，改用规则后端：{exc}")
             advice = validate_advice(self.fallback_backend.advise(context, evidence), context, evidence)
+        self.active_plan = ActivePlan.from_advice(advice, context, evidence)
+        return self._deliver(raw_state, context, evidence, advice, backend_name)
+
+    def _deliver(self, raw_state, context, evidence, advice, backend_name: str) -> Advice:
         self.output("\n" + render_console(advice, context, evidence) + "\n")
         self._record_safely(raw_state, context, evidence, advice, backend_name)
         if self.action_executor:

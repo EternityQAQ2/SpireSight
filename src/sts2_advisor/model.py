@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Protocol
 
 from .domain import Advice, DecisionContext, Evidence
+from .logging_config import get_logger
+
+
+logger = get_logger("model")
 
 
 class AdvisorBackend(Protocol):
@@ -45,6 +49,7 @@ class RuleAdvisor:
             alternative_ids=alternatives,
             evidence_ids=[item.evidence_id for item in evidence[:2]],
             warnings=["规则后端仅用于验证流程，不代表高水平策略。"],
+            plan_candidate_ids=[candidate.candidate_id],
         )
 
 
@@ -116,41 +121,181 @@ class TransformersAdvisor:
         generated = output[0][inputs["input_ids"].shape[1] :]
         text = self.tokenizer.decode(generated, skip_special_tokens=True)
         payload = extract_json_object(text)
-        return Advice(
-            decision_id=str(payload.get("decision_id", context.decision_id)),
-            candidate_id=str(payload["candidate_id"]),
-            reason=str(payload.get("reason", "")),
-            confidence=float(payload.get("confidence", 0.5)),
-            alternative_ids=[str(value) for value in payload.get("alternative_ids", [])],
-            evidence_ids=[str(value) for value in payload.get("evidence_ids", [])],
-            warnings=[str(value) for value in payload.get("warnings", [])],
+        return advice_from_payload(payload, context)
+
+
+class OpenAIAdvisor:
+    """Remote OpenAI or OpenAI-compatible chat completion backend."""
+
+    def __init__(
+        self,
+        model_name: str,
+        *,
+        api_key: str,
+        base_url: str | None = None,
+        timeout: float = 60.0,
+        max_tokens: int = 384,
+    ) -> None:
+        if not api_key:
+            raise ValueError("缺少 OPENAI_API_KEY，请在项目根目录 .env 中配置。")
+        if not model_name:
+            raise ValueError("缺少 OPENAI_MODEL，请在项目根目录 .env 中配置。")
+
+        from openai import OpenAI
+
+        kwargs = {"api_key": api_key, "timeout": timeout}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self.client = OpenAI(**kwargs)
+        self.model_name = model_name
+        self.max_tokens = max_tokens
+
+    def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_prompt(context, evidence)},
+        ]
+        try:
+            content, reasoning, finish_reason = self._complete(
+                messages, self.max_tokens, context.decision_id
+            )
+            if not content and finish_reason == "length" and self.max_tokens < 4096:
+                retry_tokens = min(max(self.max_tokens * 2, 2048), 4096)
+                logger.warning(
+                    "remote_retry_empty_content model=%s decision_id=%s max_tokens=%s",
+                    self.model_name, context.decision_id, retry_tokens,
+                )
+                content, reasoning, finish_reason = self._complete(
+                    messages, retry_tokens, context.decision_id
+                )
+        except Exception as exc:
+            logger.exception(
+                "remote_request_failed model=%s decision_id=%s error_type=%s",
+                self.model_name, context.decision_id, type(exc).__name__,
+            )
+            raise RuntimeError(f"远程模型请求失败：{exc}") from exc
+        if not content:
+            logger.warning(
+                "remote_empty_content model=%s decision_id=%s reasoning_preview=%r",
+                self.model_name, context.decision_id, reasoning[:500],
+            )
+            detail = ""
+            if reasoning:
+                detail = "；服务只返回了 reasoning_content，可能是输出上限过小或模型接口不兼容"
+            raise ValueError(f"远程模型返回了空内容{detail}，请查看运行日志")
+        return advice_from_payload(extract_json_object(content), context)
+
+    def _complete(
+        self, messages: list[dict[str, str]], max_tokens: int, decision_id: str,
+    ) -> tuple[str, str, str | None]:
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            temperature=0,
+            max_tokens=max_tokens,
         )
+        choice = response.choices[0]
+        message = choice.message
+        content = message_text(getattr(message, "content", None))
+        reasoning = message_text(
+            getattr(message, "reasoning_content", None)
+            or getattr(message, "reasoning", None)
+        )
+        usage = getattr(response, "usage", None)
+        usage_data = usage.model_dump() if hasattr(usage, "model_dump") else usage
+        cache_hit_tokens, cache_miss_tokens = cache_token_counts(usage_data)
+        finish_reason = getattr(choice, "finish_reason", None)
+        raw_response = serialize_openai_response(response)
+        logger.info(
+            "remote_response model=%s decision_id=%s finish_reason=%s usage=%s "
+            "max_tokens=%s cache_hit_tokens=%s cache_miss_tokens=%s "
+            "content_chars=%s reasoning_chars=%s raw_json=%s",
+            self.model_name,
+            decision_id,
+            finish_reason,
+            usage_data,
+            max_tokens,
+            cache_hit_tokens,
+            cache_miss_tokens,
+            len(content),
+            len(reasoning),
+            raw_response,
+        )
+        logger.info(
+            "remote_text decision_id=%s content=%s reasoning=%s",
+            decision_id,
+            json.dumps(content, ensure_ascii=False),
+            json.dumps(reasoning, ensure_ascii=False),
+        )
+        return content, reasoning, finish_reason
 
 
-SYSTEM_PROMPT = """你是《杀戮尖塔2》的只读决策建议器。
-只能从 candidates 中选择一个 candidate_id，不得创造动作、索引或目标。
-只依据提供的游戏状态与证据；证据不足时降低 confidence，不要假装确定。
-一次只建议当前下一步。不要输出思维过程，只给简短、可验证的理由。
-必须仅输出一个 JSON 对象，不要使用 Markdown。"""
+def cache_token_counts(usage) -> tuple[int | None, int | None]:
+    if not isinstance(usage, dict):
+        return None, None
+    details = usage.get("prompt_tokens_details") or {}
+    hit = usage.get("prompt_cache_hit_tokens", details.get("cached_tokens"))
+    miss = usage.get("prompt_cache_miss_tokens")
+    return hit, miss
+
+
+def serialize_openai_response(response) -> str:
+    """Serialize SDK responses and lightweight OpenAI-compatible objects."""
+    try:
+        if hasattr(response, "model_dump_json"):
+            return response.model_dump_json()
+        if hasattr(response, "model_dump"):
+            value = response.model_dump()
+        elif isinstance(response, dict):
+            value = response
+        else:
+            value = vars(response)
+        return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return json.dumps(str(response), ensure_ascii=False)
+
+
+def message_text(value) -> str:
+    """Normalize text returned by OpenAI and compatible providers."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                parts.append(str(item.get("text") or item.get("content") or ""))
+            else:
+                parts.append(str(getattr(item, "text", "") or getattr(item, "content", "")))
+        return "".join(parts).strip()
+    return str(value).strip()
+
+
+SYSTEM_PROMPT = """你是《杀戮尖塔2》的决策建议器。输入始终包含当前游戏状态、合法候选动作和检索证据。
+
+约束：
+1. candidate_id、alternative_ids 和 plan_candidate_ids 只能使用 candidates 中原样提供的 ID，不得创造动作、索引或目标。
+2. candidate_id 必须等于 plan_candidate_ids 的第一项。plan_candidate_ids 是从当前局面开始依次执行的短计划，最多 8 项。
+3. 战斗中，在当前手牌与能量足以确定后续动作时，一次规划多张牌以及必要的结束回合。可能抽牌、随机生成牌、改变手牌、进入选择界面或目标可能提前死亡时，在该不确定动作处结束计划。
+4. 商店中可按当前金币规划多个购买，但必须考虑购买后的剩余金币；奖励列表可连续领取确定性奖励，遇到打开选牌界面的奖励时结束计划。
+5. 地图、事件、选牌、休息点等结果会改变后续选择的场景只规划当前一步。
+6. 只依据提供的状态与证据；证据不足时降低 confidence，不得虚构卡牌、遗物或敌人效果。
+7. reason 不超过 120 个汉字，只解释关键取舍，不输出隐藏思维过程。
+
+只输出一个 JSON 对象，不要使用 Markdown。固定字段如下：
+{"decision_id":"输入中的decision_id","candidate_id":"当前动作ID","reason":"简短理由","confidence":0.0,"alternative_ids":[],"evidence_ids":[],"warnings":[],"plan_candidate_ids":["当前动作ID","后续动作ID"]}
+所有字段必须存在；没有备选、证据、警告或后续动作时使用空数组，plan_candidate_ids 至少包含 candidate_id。"""
 
 
 def build_prompt(context: DecisionContext, evidence: list[Evidence]) -> str:
-    schema = {
-        "decision_id": context.decision_id,
-        "candidate_id": "必须来自 candidates",
-        "reason": "不超过120字",
-        "confidence": 0.0,
-        "alternative_ids": [],
-        "evidence_ids": [],
-        "warnings": [],
-    }
     return (
         "当前局面：\n"
         + json.dumps(context.to_dict(), ensure_ascii=False, separators=(",", ":"))
         + "\n\n检索证据：\n"
         + json.dumps([item.to_dict() for item in evidence], ensure_ascii=False, separators=(",", ":"))
-        + "\n\n输出格式：\n"
-        + json.dumps(schema, ensure_ascii=False)
     )
 
 
@@ -166,6 +311,19 @@ def extract_json_object(text: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("模型返回值不是 JSON 对象")
     return payload
+
+
+def advice_from_payload(payload: dict, context: DecisionContext) -> Advice:
+    return Advice(
+        decision_id=str(payload.get("decision_id", context.decision_id)),
+        candidate_id=str(payload["candidate_id"]),
+        reason=str(payload.get("reason", "")),
+        confidence=float(payload.get("confidence", 0.5)),
+        alternative_ids=[str(value) for value in payload.get("alternative_ids", [])],
+        evidence_ids=[str(value) for value in payload.get("evidence_ids", [])],
+        warnings=[str(value) for value in payload.get("warnings", [])],
+        plan_candidate_ids=[str(value) for value in payload.get("plan_candidate_ids", [])],
+    )
 
 
 def choose_rule_candidate(context: DecisionContext):

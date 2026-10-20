@@ -8,6 +8,7 @@ dependencies = []
 
 [project.optional-dependencies]
 model = ["torch>=2.5", "transformers>=4.57", "accelerate>=1.0"]
+remote = ["openai>=1.50"]
 rag = ["chromadb>=1.0"]
 train = [
   "accelerate>=1.0",

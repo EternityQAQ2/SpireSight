@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from sts2_advisor.domain import Advice
@@ -43,6 +44,20 @@ class NormalizeTests(unittest.TestCase):
         advice = Advice(self.context.decision_id, "card:999", "非法动作", 1.0)
         with self.assertRaises(AdviceValidationError):
             validate_advice(advice, self.context, [])
+
+    def test_removes_primary_and_same_label_alternatives(self) -> None:
+        candidates = list(self.context.candidates)
+        candidates[1] = replace(candidates[1], label=candidates[0].label)
+        context = replace(self.context, candidates=candidates)
+        advice = Advice(
+            context.decision_id,
+            "card:0:NIBBIT_0",
+            "测试建议",
+            1.0,
+            alternative_ids=["card:0:NIBBIT_0", "card:1:NIBBIT_0", "card:2"],
+        )
+        validated = validate_advice(advice, context, [])
+        self.assertEqual(validated.alternative_ids, ["card:2"])
 
 
 if __name__ == "__main__":

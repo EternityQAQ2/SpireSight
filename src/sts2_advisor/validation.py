@@ -36,12 +36,37 @@ def validate_advice(
     if len(reason) > 240:
         reason = reason[:237] + "..."
 
+    plan_candidate_ids = list(dict.fromkeys(advice.plan_candidate_ids))
+    if not plan_candidate_ids:
+        plan_candidate_ids = [advice.candidate_id]
+    elif plan_candidate_ids[0] != advice.candidate_id:
+        raise AdviceValidationError("计划第一步与当前建议不一致")
+    invalid_plan = set(plan_candidate_ids) - candidate_ids
+    if invalid_plan:
+        raise AdviceValidationError(f"模型计划包含非法候选: {sorted(invalid_plan)}")
+
+    candidate_labels = {
+        candidate.candidate_id: candidate.label for candidate in context.candidates
+    }
+    selected_label = candidate_labels[advice.candidate_id]
+    alternative_ids: list[str] = []
+    alternative_labels: set[str] = set()
+    for candidate_id in advice.alternative_ids:
+        label = candidate_labels[candidate_id]
+        if candidate_id == advice.candidate_id or label == selected_label or label in alternative_labels:
+            continue
+        alternative_ids.append(candidate_id)
+        alternative_labels.add(label)
+        if len(alternative_ids) == 2:
+            break
+
     return replace(
         advice,
         reason=reason,
         confidence=max(0.0, min(1.0, advice.confidence)),
-        alternative_ids=list(dict.fromkeys(advice.alternative_ids))[:2],
+        alternative_ids=alternative_ids,
         evidence_ids=list(dict.fromkeys(advice.evidence_ids))[:6],
         warnings=list(dict.fromkeys(advice.warnings))[:4],
+        plan_candidate_ids=plan_candidate_ids[:8],
     )
 

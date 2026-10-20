@@ -16,6 +16,9 @@ def render_console(advice: Advice, context: DecisionContext, evidence: list[Evid
     alternatives = [candidates[item].label for item in advice.alternative_ids if item in candidates]
     if alternatives:
         lines.append("备选：" + "；".join(alternatives))
+    plan = [candidates[item].label for item in advice.plan_candidate_ids if item in candidates]
+    if len(plan) > 1:
+        lines.append("计划：" + " -> ".join(plan))
     evidence_by_id = {item.evidence_id: item for item in evidence}
     sources = [evidence_by_id[item].source_title for item in advice.evidence_ids if item in evidence_by_id]
     if sources:
