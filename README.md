@@ -58,12 +58,14 @@ uv sync --locked
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4.1-mini
-OPENAI_MAX_TOKENS=2048
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-flash
+OPENAI_MAX_TOKENS=1024
+OPENAI_JSON_MODE=true
+OPENAI_THINKING=disabled
 ```
 
-远程后端使用官方 `openai` Python 库，也支持兼容 OpenAI Chat Completions 的服务。进程环境变量优先于 `.env`；`.env` 已被 Git 忽略。
+远程后端使用官方 `openai` Python 库，也支持兼容 OpenAI Chat Completions 的服务。进程环境变量优先于 `.env`；`.env` 已被 Git 忽略。DeepSeek 默认使用 JSON Output 并关闭思考模式，避免为短决策生成冗长思维链；需要重新启用时设置 `OPENAI_THINKING=enabled`。
 
 运行日志写入 `logs/advisor-*.log`，包含远程 API 原始响应 JSON 以及抽取后的 `content`/`reasoning` 文本，启动时自动删除超过 3 天的日志。日志不记录 API 密钥，但可能包含游戏局面与模型回答，不应公开上传。可用 `--log-retention-days` 和 `--log-dir` 调整。
 

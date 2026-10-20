@@ -11,9 +11,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from sts2_advisor.cli import choose_backend_interactively, load_environment
+from sts2_advisor.cli import choose_backend_interactively, environment_flag, load_environment
+from sts2_advisor.domain import Evidence
 from sts2_advisor.logging_config import close_logging, configure_logging
-from sts2_advisor.model import OpenAIAdvisor, cache_token_counts
+from sts2_advisor.model import OpenAIAdvisor, SYSTEM_PROMPT, build_prompt, cache_token_counts
 from sts2_advisor.normalize import build_decision_context
 
 
@@ -21,6 +22,14 @@ FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"
 
 
 class RemoteModelTests(unittest.TestCase):
+    def test_environment_flag(self) -> None:
+        with patch.dict(os.environ, {"FEATURE": "true"}, clear=True):
+            self.assertTrue(environment_flag("FEATURE", False))
+            self.assertFalse(environment_flag("MISSING", False))
+        with patch.dict(os.environ, {"FEATURE": "invalid"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "true 或 false"):
+                environment_flag("FEATURE", False)
+
     def test_reads_deepseek_and_openai_cache_usage(self) -> None:
         self.assertEqual(
             cache_token_counts({"prompt_cache_hit_tokens": 64, "prompt_cache_miss_tokens": 128}),
@@ -70,12 +79,45 @@ class RemoteModelTests(unittest.TestCase):
                 self.chat = SimpleNamespace(completions=FakeCompletions())
 
         with patch.dict(sys.modules, {"openai": SimpleNamespace(OpenAI=FakeOpenAI)}):
-            backend = OpenAIAdvisor("remote-model", api_key="secret", base_url="https://example.test/v1")
+            backend = OpenAIAdvisor(
+                "remote-model", api_key="secret", base_url="https://example.test/v1",
+                thinking="disabled",
+            )
             advice = backend.advise(context, [])
 
         self.assertEqual(advice.candidate_id, context.candidates[0].candidate_id)
         self.assertEqual(calls[0]["model"], "remote-model")
         self.assertEqual(calls[0]["temperature"], 0)
+        self.assertEqual(calls[0]["response_format"], {"type": "json_object"})
+        self.assertEqual(calls[0]["extra_body"], {"thinking": {"type": "disabled"}})
+
+    def test_prompt_omits_low_value_metadata_and_pile_descriptions(self) -> None:
+        raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        raw["player"]["draw_pile"][0]["description"] = "牌堆独有的冗长说明"
+        context = build_decision_context(raw)
+        assert context is not None
+        evidence = Evidence(
+            "e1", "核心事实", "来源", "https://should-not-be-sent.test",
+            {"license": "metadata-should-not-be-sent"},
+        )
+        prompt = build_prompt(context, [evidence])
+        self.assertIn("核心事实", prompt)
+        self.assertNotIn("should-not-be-sent", prompt)
+        self.assertNotIn("牌堆独有的冗长说明", prompt)
+        self.assertLess(prompt.index('"evidence"'), prompt.index('"decision_id"'))
+
+        payload = json.loads(prompt.removeprefix("输入 JSON："))
+        self.assertEqual(
+            list(payload)[:4],
+            ["stable", "run", "state_type", "decision_type"],
+        )
+        self.assertNotIn("run", payload["stable"])
+
+    def test_system_prompt_keeps_json_contract_without_redundant_formatting_rules(self) -> None:
+        self.assertIn("返回 JSON 对象", SYSTEM_PROMPT)
+        self.assertIn('"plan_candidate_ids"', SYSTEM_PROMPT)
+        self.assertNotIn("不要使用 Markdown", SYSTEM_PROMPT)
+        self.assertNotIn("输出紧凑 JSON", SYSTEM_PROMPT)
 
     def test_empty_remote_content_reports_reasoning_only_response(self) -> None:
         raw = json.loads(FIXTURE.read_text(encoding="utf-8"))

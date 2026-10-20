@@ -84,6 +84,18 @@ def load_environment(path: Path) -> None:
             os.environ.setdefault(key, value)
 
 
+def environment_flag(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} 必须为 true 或 false")
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -141,20 +153,31 @@ def main(argv: list[str] | None = None) -> int:
         try:
             remote_model = os.environ.get("OPENAI_MODEL", "").strip()
             remote_max_tokens = args.remote_max_tokens or int(
-                os.environ.get("OPENAI_MAX_TOKENS", "2048")
+                os.environ.get("OPENAI_MAX_TOKENS", "1024")
             )
+            base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
+            thinking = os.environ.get("OPENAI_THINKING", "").strip().lower() or None
+            if thinking is None and base_url and "deepseek.com" in base_url.lower():
+                thinking = "disabled"
+            if thinking not in {None, "enabled", "disabled"}:
+                raise ValueError("OPENAI_THINKING 必须为 enabled 或 disabled")
             backend = OpenAIAdvisor(
                 remote_model,
                 api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
-                base_url=os.environ.get("OPENAI_BASE_URL", "").strip() or None,
+                base_url=base_url,
                 timeout=args.remote_timeout,
                 max_tokens=remote_max_tokens,
+                json_mode=environment_flag("OPENAI_JSON_MODE", True),
+                thinking=thinking,
             )
         except Exception as exc:
             print(f"远程模型配置失败：{exc}", file=sys.stderr)
             return 1
         fallback = RuleAdvisor()
-        print(f"远程模型：{remote_model}（最大输出 {remote_max_tokens} tokens）")
+        print(
+            f"远程模型：{remote_model}（最大输出 {remote_max_tokens} tokens，"
+            f"思考模式 {thinking or '服务默认'}）"
+        )
     else:
         backend = RuleAdvisor()
         fallback = None

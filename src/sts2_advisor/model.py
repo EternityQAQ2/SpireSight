@@ -134,7 +134,9 @@ class OpenAIAdvisor:
         api_key: str,
         base_url: str | None = None,
         timeout: float = 60.0,
-        max_tokens: int = 384,
+        max_tokens: int = 1024,
+        json_mode: bool = True,
+        thinking: str | None = None,
     ) -> None:
         if not api_key:
             raise ValueError("缺少 OPENAI_API_KEY，请在项目根目录 .env 中配置。")
@@ -149,12 +151,21 @@ class OpenAIAdvisor:
         self.client = OpenAI(**kwargs)
         self.model_name = model_name
         self.max_tokens = max_tokens
+        self.json_mode = json_mode
+        self.thinking = thinking
 
     def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice:
+        prompt = build_prompt(context, evidence)
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_prompt(context, evidence)},
+            {"role": "user", "content": prompt},
         ]
+        logger.info(
+            "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
+            "json_mode=%s thinking=%s max_tokens=%s",
+            self.model_name, context.decision_id, len(prompt), len(evidence),
+            self.json_mode, self.thinking, self.max_tokens,
+        )
         try:
             content, reasoning, finish_reason = self._complete(
                 messages, self.max_tokens, context.decision_id
@@ -188,12 +199,17 @@ class OpenAIAdvisor:
     def _complete(
         self, messages: list[dict[str, str]], max_tokens: int, decision_id: str,
     ) -> tuple[str, str, str | None]:
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            temperature=0,
-            max_tokens=max_tokens,
-        )
+        request = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": 0,
+            "max_tokens": max_tokens,
+        }
+        if self.json_mode:
+            request["response_format"] = {"type": "json_object"}
+        if self.thinking in {"enabled", "disabled"}:
+            request["extra_body"] = {"thinking": {"type": self.thinking}}
+        response = self.client.chat.completions.create(**request)
         choice = response.choices[0]
         message = choice.message
         content = message_text(getattr(message, "content", None))
@@ -274,29 +290,68 @@ def message_text(value) -> str:
     return str(value).strip()
 
 
-SYSTEM_PROMPT = """你是《杀戮尖塔2》的决策建议器。输入始终包含当前游戏状态、合法候选动作和检索证据。
-
-约束：
-1. candidate_id、alternative_ids 和 plan_candidate_ids 只能使用 candidates 中原样提供的 ID，不得创造动作、索引或目标。
-2. candidate_id 必须等于 plan_candidate_ids 的第一项。plan_candidate_ids 是从当前局面开始依次执行的短计划，最多 8 项。
-3. 战斗中，在当前手牌与能量足以确定后续动作时，一次规划多张牌以及必要的结束回合。可能抽牌、随机生成牌、改变手牌、进入选择界面或目标可能提前死亡时，在该不确定动作处结束计划。
-4. 商店中可按当前金币规划多个购买，但必须考虑购买后的剩余金币；奖励列表可连续领取确定性奖励，遇到打开选牌界面的奖励时结束计划。
-5. 地图、事件、选牌、休息点等结果会改变后续选择的场景只规划当前一步。
-6. 只依据提供的状态与证据；证据不足时降低 confidence，不得虚构卡牌、遗物或敌人效果。
-7. reason 不超过 120 个汉字，只解释关键取舍，不输出隐藏思维过程。
-
-只输出一个 JSON 对象，不要使用 Markdown。固定字段如下：
-{"decision_id":"输入中的decision_id","candidate_id":"当前动作ID","reason":"简短理由","confidence":0.0,"alternative_ids":[],"evidence_ids":[],"warnings":[],"plan_candidate_ids":["当前动作ID","后续动作ID"]}
-所有字段必须存在；没有备选、证据、警告或后续动作时使用空数组，plan_candidate_ids 至少包含 candidate_id。"""
+SYSTEM_PROMPT = """你是《杀戮尖塔2》决策建议器。输入含状态、合法动作 candidates 和证据 evidence。
+规则：
+1. 所有动作 ID 必须逐字来自 candidates；candidate_id 是 plan_candidate_ids 首项，计划共 1 至 8 步。
+2. 战斗可规划当前手牌、能量下确定的连续动作；遇抽牌、随机、手牌变化、选择界面或目标可能提前死亡即停止。
+3. 商店可按余额连续购买；奖励可连续领取确定项，打开选牌时停止。
+4. 地图、事件、选牌、休息点只规划当前一步。
+5. 只依据输入；证据不足则降低 confidence，不虚构效果。reason 不超过 80 个汉字，不输出思维过程。
+返回 JSON 对象，必须且只能包含：
+{"decision_id":"输入值","candidate_id":"动作ID","reason":"理由","confidence":0.0,"alternative_ids":[],"evidence_ids":[],"warnings":[],"plan_candidate_ids":["动作ID"]}
+confidence 范围 0 至 1；无值的数组用 []。"""
 
 
 def build_prompt(context: DecisionContext, evidence: list[Evidence]) -> str:
-    return (
-        "当前局面：\n"
-        + json.dumps(context.to_dict(), ensure_ascii=False, separators=(",", ":"))
-        + "\n\n检索证据：\n"
-        + json.dumps([item.to_dict() for item in evidence], ensure_ascii=False, separators=(",", ":"))
+    payload = model_context_payload(context)
+    payload["evidence"] = [
+        {"id": item.evidence_id, "title": item.source_title, "text": item.text}
+        for item in evidence
+    ]
+    payload["decision_id"] = context.decision_id
+    return "输入 JSON：" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def model_context_payload(context: DecisionContext) -> dict:
+    """Build a smaller prompt with stable fields first for provider prefix caching."""
+    player = context.player
+    relics = player.get("relics", [])
+    stable = {
+        "character": player.get("character"),
+        "max_hp": player.get("max_hp"),
+        "max_energy": player.get("max_energy"),
+        "relics": [
+            compact_fields(item, ("id", "name", "description")) for item in relics
+        ],
+    }
+    dynamic_player = compact_fields(
+        player, ("hp", "block", "energy", "gold", "status", "potions", "max_potion_slots")
     )
+    dynamic_player["relic_counters"] = [
+        {"id": item.get("id"), "counter": item.get("counter")}
+        for item in relics if item.get("counter") is not None
+    ]
+    dynamic_player["hand"] = player.get("hand", [])
+    for pile in ("draw_pile", "discard_pile", "exhaust_pile"):
+        dynamic_player[pile] = [
+            compact_fields(card, ("name", "cost", "count"))
+            for card in player.get(pile, [])
+        ]
+    return {
+        "stable": stable,
+        "run": context.run,
+        "state_type": context.state_type,
+        "decision_type": context.decision_type,
+        "player": dynamic_player,
+        "situation": context.situation,
+        "candidates": [
+            {"id": item.candidate_id, "label": item.label} for item in context.candidates
+        ],
+    }
+
+
+def compact_fields(value: dict, fields: tuple[str, ...]) -> dict:
+    return {field: value[field] for field in fields if field in value}
 
 
 def extract_json_object(text: str) -> dict:
