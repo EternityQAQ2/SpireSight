@@ -8,6 +8,7 @@ from typing import Protocol
 
 from .domain import Advice, DecisionContext, Evidence
 from .logging_config import get_logger
+from .record import record_event, recorded_call, recording_enabled
 
 
 logger = get_logger("model")
@@ -71,6 +72,7 @@ class TransformersAdvisor:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self.torch = torch
+        self.model_name = model_name
         self.max_new_tokens = max_new_tokens
         self.device = select_device(torch, device)
         dtype = torch.float32 if self.device == "cpu" else torch.float16
@@ -99,29 +101,42 @@ class TransformersAdvisor:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
-        if hasattr(self.tokenizer, "apply_chat_template"):
-            rendered = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=False,
-            )
-        else:
-            rendered = SYSTEM_PROMPT + "\n\n" + prompt
-        inputs = self.tokenizer(rendered, return_tensors="pt")
-        device = next(self.model.parameters()).device
-        inputs = {key: value.to(device) for key, value in inputs.items()}
-        with self.torch.inference_mode():
-            output = self.model.generate(
-                **inputs,
-                max_new_tokens=self.max_new_tokens,
-                do_sample=False,
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
-        generated = output[0][inputs["input_ids"].shape[1] :]
-        text = self.tokenizer.decode(generated, skip_special_tokens=True)
-        payload = extract_json_object(text)
-        return advice_from_payload(payload, context)
+        with recorded_call("model", backend="transformers", request={
+            "model": self.model_name, "messages": messages, "device": self.device,
+            "max_new_tokens": self.max_new_tokens, "do_sample": False,
+            "pad_token_id": self.tokenizer.eos_token_id,
+        }) as call_id:
+            if hasattr(self.tokenizer, "apply_chat_template"):
+                rendered = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+            else:
+                rendered = SYSTEM_PROMPT + "\n\n" + prompt
+            inputs = self.tokenizer(rendered, return_tensors="pt")
+            if recording_enabled():
+                generation_config = getattr(self.model, "generation_config", None)
+                record_event("model.input", call_id=call_id, rendered_prompt=rendered,
+                             inputs={key: value.tolist() for key, value in inputs.items()},
+                             generation_config=generation_config.to_dict() if generation_config else None)
+            device = next(self.model.parameters()).device
+            inputs = {key: value.to(device) for key, value in inputs.items()}
+            with self.torch.inference_mode():
+                output = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                )
+            generated = output[0][inputs["input_ids"].shape[1] :]
+            text = self.tokenizer.decode(generated, skip_special_tokens=True)
+            record_event("model.response", call_id=call_id, content=text,
+                         generated_token_ids=generated.tolist() if recording_enabled() else None)
+            payload = extract_json_object(text)
+            record_event("model.parsed", call_id=call_id, payload=payload)
+            return advice_from_payload(payload, context)
 
 
 class OpenAIAdvisor:
@@ -209,41 +224,48 @@ class OpenAIAdvisor:
             request["response_format"] = {"type": "json_object"}
         if self.thinking in {"enabled", "disabled"}:
             request["extra_body"] = {"thinking": {"type": self.thinking}}
-        response = self.client.chat.completions.create(**request)
-        choice = response.choices[0]
-        message = choice.message
-        content = message_text(getattr(message, "content", None))
-        reasoning = message_text(
-            getattr(message, "reasoning_content", None)
-            or getattr(message, "reasoning", None)
-        )
-        usage = getattr(response, "usage", None)
-        usage_data = usage.model_dump() if hasattr(usage, "model_dump") else usage
-        cache_hit_tokens, cache_miss_tokens = cache_token_counts(usage_data)
-        finish_reason = getattr(choice, "finish_reason", None)
-        raw_response = serialize_openai_response(response)
-        logger.info(
-            "remote_response model=%s decision_id=%s finish_reason=%s usage=%s "
-            "max_tokens=%s cache_hit_tokens=%s cache_miss_tokens=%s "
-            "content_chars=%s reasoning_chars=%s raw_json=%s",
-            self.model_name,
-            decision_id,
-            finish_reason,
-            usage_data,
-            max_tokens,
-            cache_hit_tokens,
-            cache_miss_tokens,
-            len(content),
-            len(reasoning),
-            raw_response,
-        )
-        logger.info(
-            "remote_text decision_id=%s content=%s reasoning=%s",
-            decision_id,
-            json.dumps(content, ensure_ascii=False),
-            json.dumps(reasoning, ensure_ascii=False),
-        )
-        return content, reasoning, finish_reason
+        with recorded_call("model", backend="openai", request=request) as call_id:
+            response = self.client.chat.completions.create(**request)
+            record_event("model.raw_response", call_id=call_id,
+                         response=json.loads(serialize_openai_response(response)))
+            choice = response.choices[0]
+            message = choice.message
+            content = message_text(getattr(message, "content", None))
+            reasoning = message_text(
+                getattr(message, "reasoning_content", None)
+                or getattr(message, "reasoning", None)
+            )
+            usage = getattr(response, "usage", None)
+            usage_data = usage.model_dump() if hasattr(usage, "model_dump") else usage
+            cache_hit_tokens, cache_miss_tokens = cache_token_counts(usage_data)
+            finish_reason = getattr(choice, "finish_reason", None)
+            raw_response = serialize_openai_response(response)
+            record_event("model.response", call_id=call_id, raw_response=json.loads(raw_response),
+                         content=content, reasoning=reasoning, finish_reason=finish_reason,
+                         usage=usage_data, cache_hit_tokens=cache_hit_tokens,
+                         cache_miss_tokens=cache_miss_tokens)
+            logger.info(
+                "remote_response model=%s decision_id=%s finish_reason=%s usage=%s "
+                "max_tokens=%s cache_hit_tokens=%s cache_miss_tokens=%s "
+                "content_chars=%s reasoning_chars=%s raw_json=%s",
+                self.model_name,
+                decision_id,
+                finish_reason,
+                usage_data,
+                max_tokens,
+                cache_hit_tokens,
+                cache_miss_tokens,
+                len(content),
+                len(reasoning),
+                raw_response,
+            )
+            logger.info(
+                "remote_text decision_id=%s content=%s reasoning=%s",
+                decision_id,
+                json.dumps(content, ensure_ascii=False),
+                json.dumps(reasoning, ensure_ascii=False),
+            )
+            return content, reasoning, finish_reason
 
 
 def cache_token_counts(usage) -> tuple[int | None, int | None]:

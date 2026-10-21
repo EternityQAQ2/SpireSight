@@ -11,10 +11,12 @@ from http.client import HTTPException
 from typing import Any, Callable
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 from .api import Sts2ApiError, Sts2RestClient
 from .domain import Advice, DecisionContext
 from .normalize import build_decision_context
+from .record import record_event
 from .validation import AdviceValidationError
 
 
@@ -43,14 +45,23 @@ def action(
             "User-Agent": "sts2-advisor/0.1",
         },
     )
+    action_id = str(uuid4())
+    record_event("action.request", action_id=action_id, method="POST",
+                 endpoint="/api/v1/singleplayer", request={"action": action_type, **params})
     try:
         with urlopen(request, timeout=client.timeout) as response:
             raw = response.read()
+            status = response.status
     except HTTPError as exc:
-        message = Sts2RestClient._error_message(exc.read()) or str(exc)
+        raw = exc.read()
+        record_event("action.error", action_id=action_id, outcome="http_error", http_status=exc.code,
+                     raw_body=raw.decode("utf-8", errors="replace"), message=str(exc))
+        message = Sts2RestClient._error_message(raw) or str(exc)
         raise Sts2ApiError(f"STS2MCP HTTP {exc.code}: {message}") from exc
     except (OSError, HTTPException) as exc:
         reason = getattr(exc, "reason", exc)
+        record_event("action.error", action_id=action_id, outcome="unknown",
+                     error_type=type(exc).__name__, message=str(reason))
         raise Sts2ApiError(
             f"STS2MCP 动作请求失败 ({reason})，结果未确认，请先核对游戏状态。"
         ) from exc
@@ -58,7 +69,11 @@ def action(
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        record_event("action.error", action_id=action_id, outcome="unknown", http_status=status,
+                     raw_body=raw.decode("utf-8", errors="replace"), message=str(exc))
         raise Sts2ApiError("STS2MCP 返回了无效 JSON") from exc
+    record_event("action.response", action_id=action_id, http_status=status, response=payload,
+                 raw_body=raw.decode("utf-8"))
     if not isinstance(payload, dict):
         raise Sts2ApiError("STS2MCP 响应必须是 JSON 对象")
     if payload.get("status") != "ok":
@@ -85,9 +100,14 @@ class ActionExecutor:
         if candidate is None or not candidate.legal:
             raise AdviceValidationError(f"不能执行非法候选：{advice.candidate_id}")
         if context.decision_id == self.last_decision_id:
+            record_event("action.skipped", reason="duplicate", decision_id=context.decision_id)
             return None
-        latest = build_decision_context(self.client.get_singleplayer_state())
+        latest_raw = self.client.get_singleplayer_state()
+        record_event("action.precheck", raw_state=latest_raw)
+        latest = build_decision_context(latest_raw)
         if latest is None or latest.decision_id != context.decision_id:
+            record_event("action.skipped", reason="stale", decision_id=context.decision_id,
+                         latest_decision_id=latest.decision_id if latest else None)
             self.output("游戏状态已变化，跳过过期动作，等待下一次决策。")
             return None
 

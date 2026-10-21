@@ -6,6 +6,9 @@ import json
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from uuid import uuid4
+
+from .record import record_event
 
 
 class Sts2ApiError(RuntimeError):
@@ -29,15 +32,23 @@ class Sts2RestClient:
             method="GET",
             headers={"Accept": "application/json", "User-Agent": "sts2-advisor/0.1"},
         )
+        request_id = str(uuid4())
+        record_event("environment.request", request_id=request_id, method="GET", endpoint=path)
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read()
+                record_event("environment.response", request_id=request_id,
+                             http_status=response.status, raw_body=raw.decode("utf-8", errors="replace"))
         except HTTPError as exc:
             raw = exc.read()
+            record_event("environment.response", request_id=request_id, http_status=exc.code,
+                         raw_body=raw.decode("utf-8", errors="replace"))
             message = self._error_message(raw) or str(exc)
             raise Sts2ApiError(f"STS2MCP HTTP {exc.code}: {message}") from exc
         except (URLError, TimeoutError) as exc:
             reason = getattr(exc, "reason", exc)
+            record_event("environment.transport_error", request_id=request_id,
+                         error_type=type(exc).__name__, message=str(reason))
             raise Sts2ApiError(
                 f"无法连接 STS2MCP ({reason})。请确认游戏、模组和 localhost:15526 已启动。"
             ) from exc

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .domain import DecisionContext, Evidence
+from .record import record_event
 
 
 class Retriever(Protocol):
@@ -26,6 +27,7 @@ class JsonKnowledgeRetriever:
     """Dependency-free lexical fallback for JSONL knowledge records."""
 
     def __init__(self, path: Path) -> None:
+        self.path = path
         self.records: list[Evidence] = []
         if not path.exists():
             return
@@ -48,6 +50,9 @@ class JsonKnowledgeRetriever:
 
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
         query_terms = tokenize(json.dumps(context.to_dict(), ensure_ascii=False))
+        record_event("retrieval.query", provider="json", path=str(self.path), top_k=top_k,
+                     query_terms=sorted(query_terms), decision_type=context.decision_type,
+                     character=context.player.get("character"))
         scored: list[tuple[float, Evidence]] = []
         for evidence in self.records:
             if not metadata_matches(evidence.metadata, context):
@@ -57,6 +62,8 @@ class JsonKnowledgeRetriever:
             score = 0.1 + sum(1.0 + math.log1p(len(term)) for term in overlap)
             scored.append((score, evidence))
         scored.sort(key=lambda pair: pair[0], reverse=True)
+        record_event("retrieval.ranked", provider="json", score_kind="lexical_overlap",
+                     hits=[{"score": score, "evidence": evidence.to_dict()} for score, evidence in scored[:top_k]])
         return [evidence for _, evidence in scored[:top_k]]
 
 
@@ -74,7 +81,9 @@ class ChromaRetriever:
         if self.collection.count() == 0:
             return []
         query = build_query(context)
+        record_event("retrieval.query", provider="chroma", query=query, top_k=top_k)
         result = self.collection.query(query_texts=[query], n_results=top_k)
+        record_event("retrieval.raw_result", provider="chroma", result=result)
         evidences: list[Evidence] = []
         ids = (result.get("ids") or [[]])[0]
         documents = (result.get("documents") or [[]])[0]
@@ -139,6 +148,8 @@ class SqliteFactsRetriever:
         collect(context.player)
         collect(context.situation)
         identifiers, labels = sorted(ids), sorted(names)
+        record_event("retrieval.query", provider="sqlite", path=str(self.path), top_k=top_k,
+                     identifiers=identifiers, names=labels, tables=list(self.TABLES))
         id_slots = ",".join("?" for _ in identifiers) or "NULL"
         name_slots = ",".join("?" for _ in labels) or "NULL"
         facts: list[Evidence] = []
@@ -150,6 +161,8 @@ class SqliteFactsRetriever:
                     f"OR name IN ({name_slots}) ORDER BY id",
                     identifiers + labels,
                 ).fetchall()
+                record_event("retrieval.rows", provider="sqlite", table=table,
+                             rows=[dict(row) for row in rows])
                 # 同名卡牌可能属于不同角色，已有准确 ID 时优先使用对应记录。
                 exact_names = {row["name"] for row in rows if row["id"].lower() in ids}
                 for row in rows:
@@ -171,6 +184,8 @@ class SqliteFactsRetriever:
                 "JOIN interaction_pages p ON p.interaction_id = i.id "
                 "WHERE instr(?, p.page_name) > 0 ORDER BY i.id LIMIT ?", (query, top_k),
             ).fetchall()
+            record_event("retrieval.rows", provider="sqlite", table="interactions", query=query,
+                         rows=[dict(row) for row in rows])
             interactions = [Evidence(
                 f"sqlite:interactions:{row['id']}", row["description"], "灰机 Wiki：效果交互",
                 metadata={"table": "interactions"},
