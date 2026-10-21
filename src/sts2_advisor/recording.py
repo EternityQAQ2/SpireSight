@@ -5,13 +5,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .domain import Advice, DecisionContext, Evidence
+from .record import TrajectoryRecorder
 
 
 class SessionRecorder:
-    def __init__(self, directory: Path, enabled: bool = True) -> None:
+    def __init__(self, directory: Path, enabled: bool = True, *, metadata: dict | None = None) -> None:
         self.enabled = enabled
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.trajectory = TrajectoryRecorder(directory, enabled, metadata=metadata)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         self.path = directory / f"session-{stamp}.jsonl"
+
+    def close(self, status: str = "completed") -> None:
+        self.trajectory.close(status)
 
     def record(
         self,
@@ -25,6 +30,8 @@ class SessionRecorder:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
+            "session_id": self.trajectory.session_id,
+            "step_id": self.trajectory.current_step_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "backend": backend,
             "raw_state": raw_state,

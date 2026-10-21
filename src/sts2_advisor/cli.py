@@ -183,16 +183,20 @@ def main(argv: list[str] | None = None) -> int:
         fallback = None
     logger.info("backend_ready backend=%s log_path=%s", args.backend, log_path)
 
+    recorder = SessionRecorder(
+        args.recording_dir, not args.no_record, metadata={"config": vars(args)},
+    )
     service = AdvisorService(
         client,
         retriever,
         backend,
-        SessionRecorder(args.recording_dir, not args.no_record),
+        recorder,
         backend_name=args.backend,
         fallback_backend=fallback,
         top_k=args.top_k,
         auto_act=args.auto_act,
     )
+    session_status = "completed"
     try:
         if args.watch:
             service.watch(args.poll_interval, args.stable_reads)
@@ -200,11 +204,18 @@ def main(argv: list[str] | None = None) -> int:
         service.run_once(force=True)
         return 0
     except Sts2ApiError as exc:
+        session_status = "error"
         print(f"API 错误：{exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
+        session_status = "interrupted"
         print("\n已停止监听。")
         return 0
+    except BaseException:
+        session_status = "error"
+        raise
+    finally:
+        recorder.close(session_status)
 
 
 if __name__ == "__main__":
