@@ -59,6 +59,40 @@ class NormalizeTests(unittest.TestCase):
         validated = validate_advice(advice, context, [])
         self.assertEqual(validated.alternative_ids, ["card:2"])
 
+    def test_open_shop_always_exposes_proceed_to_close_inventory(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "shop",
+                "run": {"act": 1, "floor": 9},
+                "player": {"gold": 33},
+                "shop": {
+                    "items": [],
+                    "is_open": True,
+                    "can_proceed": False,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["shop:proceed"])
+        self.assertEqual(context.candidates[0].action_type, "proceed")
+
+    def test_closed_shop_exposes_proceed_to_leave_room(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "shop",
+                "run": {"act": 1, "floor": 9},
+                "player": {"gold": 33},
+                "shop": {
+                    "items": [],
+                    "is_open": False,
+                    "can_proceed": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["shop:proceed"])
+        self.assertEqual(context.candidates[0].action_type, "proceed")
+
 
 if __name__ == "__main__":
     unittest.main()

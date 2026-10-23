@@ -29,6 +29,7 @@ class SqliteRetrievalTests(unittest.TestCase):
                     ("strike_silent", "打击", "另一角色的打击。"),
                     ("strike_ironclad_upgrade", "打击+", "造成9点伤害。"),
                     ("unrelated", "无关卡牌", "不应检索到。"),
+                    ("pile_only", "牌堆专用", "不应因牌堆而检索。"),
                 ],
             )
             connection.execute(
@@ -69,6 +70,15 @@ class SqliteRetrievalTests(unittest.TestCase):
         ids = {item.evidence_id for item in evidence}
         self.assertIn("sqlite:cards:strike_ironclad_upgrade", ids)
         self.assertNotIn("sqlite:cards:strike_ironclad", ids)
+
+    def test_ignores_draw_pile_when_collecting_current_facts(self):
+        self.raw["player"]["draw_pile"] = [{
+            "id": "pile_only", "name": "牌堆专用", "cost": "1", "description": "不应因牌堆而检索。",
+        }]
+        context = build_decision_context(self.raw)
+        assert context is not None
+        ids = {item.evidence_id for item in SqliteFactsRetriever(self.db).retrieve(context, 20)}
+        self.assertNotIn("sqlite:cards:pile_only", ids)
 
     def test_auto_combines_sqlite_facts_with_existing_guides_and_respects_top_k(self):
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):

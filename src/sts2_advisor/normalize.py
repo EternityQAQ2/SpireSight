@@ -201,8 +201,9 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
                 continue
             name = item.get("card_name") or item.get("relic_name") or item.get("potion_name") or item.get("category", "商品")
             result.append(Candidate(f"shop:{item['index']}", "shop_purchase", str(name), {"index": item["index"]}))
-        if shop.get("can_proceed"):
-            result.append(Candidate("shop:proceed", "proceed", "离开商店"))
+        if shop.get("is_open") or shop.get("can_proceed"):
+            label = "关闭商店界面" if shop.get("is_open") else "离开商店"
+            result.append(Candidate("shop:proceed", "proceed", label))
         return result
     if state_type == "treasure":
         data = raw.get("treasure", {})
