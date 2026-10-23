@@ -219,10 +219,17 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return result
     if state_type == "card_select":
         data = raw.get("card_select", {})
+        if data.get("preview_showing") and data.get("can_confirm"):
+            return [Candidate("card_select:confirm", "confirm_selection", "Confirm selection")]
+        selected_indices = {
+            card["index"]
+            for card in data.get("selected_cards", [])
+            if isinstance(card, dict) and "index" in card
+        }
         result = [
             Candidate(f"card_select:{card['index']}", "select_card", card.get("name", "卡牌"), {"index": card["index"]})
             for card in data.get("cards", [])
-            if "index" in card
+            if "index" in card and card["index"] not in selected_indices
         ]
         if data.get("can_confirm"):
             result.append(Candidate("card_select:confirm", "confirm_selection", "确认选择"))

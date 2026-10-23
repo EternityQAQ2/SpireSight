@@ -115,6 +115,51 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(context.candidates[0].action_type, "combat_confirm_selection")
 
 
+    def test_card_multi_select_excludes_already_selected_cards(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "card_select",
+                "run": {"act": 2, "floor": 21},
+                "player": {},
+                "card_select": {
+                    "screen_type": "select",
+                    "cards": [
+                        {"index": 0, "name": "Shrug It Off"},
+                        {"index": 1, "name": "Thunderclap"},
+                        {"index": 2, "name": "Taunt"},
+                    ],
+                    "selected_cards": [{"index": 0, "name": "Shrug It Off"}],
+                    "selected_count": 1,
+                    "preview_showing": False,
+                    "can_confirm": False,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual(
+            [candidate.candidate_id for candidate in context.candidates],
+            ["card_select:1", "card_select:2"],
+        )
+
+    def test_card_select_preview_only_exposes_confirm(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "card_select",
+                "run": {"act": 2, "floor": 21},
+                "player": {},
+                "card_select": {
+                    "cards": [{"index": 0, "name": "Shrug It Off"}],
+                    "selected_cards": [{"index": 0, "name": "Shrug It Off"}],
+                    "selected_count": 1,
+                    "preview_showing": True,
+                    "can_confirm": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["card_select:confirm"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
