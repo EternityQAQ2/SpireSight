@@ -130,6 +130,8 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return combat_candidates(raw)
     if state_type == "hand_select":
         data = raw.get("hand_select", {})
+        if data.get("mode") == "upgrade_select" and data.get("can_confirm"):
+            return [Candidate("hand_select:confirm", "combat_confirm_selection", "确认选择")]
         result = [
             Candidate(f"hand_select:{card['index']}", "combat_select_card", card.get("name", "选择卡牌"), {"card_index": card["index"]})
             for card in data.get("cards", [])
@@ -201,8 +203,9 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
                 continue
             name = item.get("card_name") or item.get("relic_name") or item.get("potion_name") or item.get("category", "商品")
             result.append(Candidate(f"shop:{item['index']}", "shop_purchase", str(name), {"index": item["index"]}))
-        if shop.get("can_proceed"):
-            result.append(Candidate("shop:proceed", "proceed", "离开商店"))
+        if shop.get("is_open") or shop.get("can_proceed"):
+            label = "关闭商店界面" if shop.get("is_open") else "离开商店"
+            result.append(Candidate("shop:proceed", "proceed", label))
         return result
     if state_type == "treasure":
         data = raw.get("treasure", {})
@@ -216,10 +219,17 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return result
     if state_type == "card_select":
         data = raw.get("card_select", {})
+        if data.get("preview_showing") and data.get("can_confirm"):
+            return [Candidate("card_select:confirm", "confirm_selection", "Confirm selection")]
+        selected_indices = {
+            card["index"]
+            for card in data.get("selected_cards", [])
+            if isinstance(card, dict) and "index" in card
+        }
         result = [
             Candidate(f"card_select:{card['index']}", "select_card", card.get("name", "卡牌"), {"index": card["index"]})
             for card in data.get("cards", [])
-            if "index" in card
+            if "index" in card and card["index"] not in selected_indices
         ]
         if data.get("can_confirm"):
             result.append(Candidate("card_select:confirm", "confirm_selection", "确认选择"))

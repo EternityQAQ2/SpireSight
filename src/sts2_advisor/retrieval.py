@@ -145,7 +145,14 @@ class SqliteFactsRetriever:
                 for item in value:
                     collect(item)
 
-        collect(context.player)
+        # 牌堆中的卡当前不能直接操作；用它们扩展 SQLite 查询只会把无关卡牌
+        # 事实塞进战斗提示词。检索只覆盖本回合可见、会影响当前决策的实体。
+        collect({
+            "hand": context.player.get("hand", []),
+            "relics": context.player.get("relics", []),
+            "potions": context.player.get("potions", []),
+            "status": context.player.get("status", []),
+        })
         collect(context.situation)
         identifiers, labels = sorted(ids), sorted(names)
         record_event("retrieval.query", provider="sqlite", path=str(self.path), top_k=top_k,

@@ -149,6 +149,91 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(retriever.calls, 1)
         self.assertTrue(any("未请求模型" in line for line in output))
 
+    def test_service_bypasses_retrieval_and_model_for_single_legal_action(self) -> None:
+        raw = {
+            "state_type": "rewards",
+            "run": {},
+            "player": {},
+            "rewards": {"items": [], "can_proceed": True},
+        }
+
+        class Client:
+            def get_singleplayer_state(self):
+                return raw
+
+        class Retriever:
+            calls = 0
+
+            def retrieve(self, context, top_k=6):
+                self.calls += 1
+                return []
+
+        class Backend:
+            calls = 0
+
+            def advise(self, context, evidence):
+                self.calls += 1
+                raise AssertionError("确定性局面不应调用模型")
+
+        class Recorder:
+            def record(self, *args):
+                pass
+
+        retriever = Retriever()
+        backend = Backend()
+        output: list[str] = []
+        service = AdvisorService(
+            Client(), retriever, backend, Recorder(),
+            backend_name="test", output=output.append,
+        )
+        self.assertTrue(service.run_once())
+        self.assertEqual(retriever.calls, 0)
+        self.assertEqual(backend.calls, 0)
+        self.assertTrue(any("仅有一个" in line for line in output))
+
+    def test_service_keeps_legal_action_when_model_plan_is_invalid(self) -> None:
+        states = [self.raw]
+
+        class Client:
+            def get_singleplayer_state(self):
+                return states.pop(0)
+
+        class Retriever:
+            def retrieve(self, context, top_k=6):
+                return []
+
+        first_id = self.first.candidate_id
+
+        class Backend:
+            def advise(self, context, evidence):
+                return Advice(
+                    context.decision_id, first_id, "当前动作合法", 0.8,
+                    plan_candidate_ids=[first_id, "card:not-a-real-action"],
+                )
+
+        class Fallback:
+            def advise(self, context, evidence):
+                raise AssertionError("合法当前动作不应因后续计划错误而降级")
+
+        class Recorder:
+            def __init__(self):
+                self.rows = []
+
+            def record(self, *args):
+                self.rows.append(args)
+
+        recorder = Recorder()
+        output: list[str] = []
+        service = AdvisorService(
+            Client(), Retriever(), Backend(), recorder,
+            backend_name="test", fallback_backend=Fallback(), output=output.append,
+        )
+        self.assertTrue(service.run_once())
+        self.assertEqual(recorder.rows[-1][3].candidate_id, first_id)
+        self.assertEqual(recorder.rows[-1][3].plan_candidate_ids, [first_id])
+        self.assertEqual(recorder.rows[-1][3].warnings, ["模型后续计划无效，已仅保留当前动作。"])
+        self.assertFalse(any("改用规则后端" in line for line in output))
+
     def test_shop_plan_requires_expected_purchase_and_gold_change(self) -> None:
         first = Candidate("shop:0", "shop_purchase", "卡牌甲", {"index": 0})
         second = Candidate("shop:1", "shop_purchase", "卡牌乙", {"index": 1})

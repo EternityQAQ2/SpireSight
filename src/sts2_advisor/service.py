@@ -3,11 +3,12 @@ from __future__ import annotations
 import sys
 import time
 from contextlib import nullcontext
+from dataclasses import replace
 from typing import Callable
 
 from .action import ActionExecutor
 from .api import Sts2ApiError, Sts2RestClient
-from .domain import Advice
+from .domain import Advice, DecisionContext
 from .model import AdvisorBackend, RuleAdvisor
 from .logging_config import get_logger
 from .normalize import build_decision_context
@@ -129,14 +130,41 @@ class AdvisorService:
             record_event("plan.invalidated", origin_step_id=self._plan_origin_step_id)
             self._plan_origin_step_id = None
 
-        record_event("retrieval.request", context=context.to_dict(), top_k=self.top_k,
+        deterministic = deterministic_advice(context)
+        if deterministic is not None:
+            self.active_plan = None
+            record_event(
+                "decision.deterministic",
+                reason="single_legal_candidate",
+                advice=deterministic.to_dict(),
+            )
+            logger.info(
+                "deterministic_advice decision_id=%s candidate_id=%s",
+                context.decision_id, deterministic.candidate_id,
+            )
+            self.output("当前仅有一个合法动作，本次未请求检索或模型。")
+            return self._deliver(raw_state, context, [], deterministic, "deterministic")
+
+        retrieval_top_k = min(self.top_k, 4) if context.decision_type == "combat_next_action" else self.top_k
+        record_event("retrieval.request", context=context.to_dict(), top_k=retrieval_top_k,
                      retriever=type(self.retriever).__name__)
-        evidence = self.retriever.retrieve(context, self.top_k)
+        evidence = self.retriever.retrieve(context, retrieval_top_k)
         record_event("retrieval.result", evidence=[item.to_dict() for item in evidence])
         backend_name = self.backend_name
         try:
             proposed = self.backend.advise(context, evidence)
             record_event("decision.proposal", backend=backend_name, advice=proposed.to_dict())
+            proposed, repair_reason = repair_plan_if_current_action_is_legal(proposed, context)
+            if repair_reason is not None:
+                record_event(
+                    "decision.plan_repaired",
+                    reason=repair_reason,
+                    advice=proposed.to_dict(),
+                )
+                logger.warning(
+                    "plan_repaired decision_id=%s candidate_id=%s reason=%s",
+                    context.decision_id, proposed.candidate_id, repair_reason,
+                )
             advice = validate_advice(proposed, context, evidence)
         except (AdviceValidationError, ValueError, RuntimeError) as exc:
             record_event("decision.validation_error", error_type=type(exc).__name__, message=str(exc))
@@ -177,3 +205,43 @@ class AdvisorService:
             self.recorder.record(raw_state, context, evidence, advice, backend_name)
         except OSError as exc:
             self.output(f"警告：无法写入会话记录，建议流程继续运行：{exc}")
+
+
+def deterministic_advice(context: DecisionContext) -> Advice | None:
+    """Avoid remote inference only when the game exposes exactly one legal action."""
+    if len(context.candidates) != 1:
+        return None
+    candidate = context.candidates[0]
+    return Advice(
+        decision_id=context.decision_id,
+        candidate_id=candidate.candidate_id,
+        reason="当前仅有一个合法动作，直接建议执行。",
+        confidence=1.0,
+        plan_candidate_ids=[candidate.candidate_id],
+    )
+
+
+def repair_plan_if_current_action_is_legal(
+    advice: Advice, context: DecisionContext,
+) -> tuple[Advice, str | None]:
+    """Keep a legal immediate action when only the optional future plan is invalid."""
+    candidate_ids = {candidate.candidate_id for candidate in context.candidates}
+    if advice.candidate_id not in candidate_ids:
+        return advice, None
+
+    plan = list(dict.fromkeys(advice.plan_candidate_ids))
+    if not plan:
+        return advice, None
+    if plan[0] != advice.candidate_id:
+        reason = "plan_first_step_mismatch"
+    elif invalid_steps := sorted(set(plan) - candidate_ids):
+        reason = f"illegal_plan_steps:{','.join(invalid_steps)}"
+    else:
+        return advice, None
+
+    warning = "模型后续计划无效，已仅保留当前动作。"
+    return replace(
+        advice,
+        warnings=list(dict.fromkeys([*advice.warnings, warning])),
+        plan_candidate_ids=[advice.candidate_id],
+    ), reason
