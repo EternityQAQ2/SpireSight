@@ -130,6 +130,8 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return combat_candidates(raw)
     if state_type == "hand_select":
         data = raw.get("hand_select", {})
+        if data.get("mode") == "upgrade_select" and data.get("can_confirm"):
+            return [Candidate("hand_select:confirm", "combat_confirm_selection", "确认选择")]
         result = [
             Candidate(f"hand_select:{card['index']}", "combat_select_card", card.get("name", "选择卡牌"), {"card_index": card["index"]})
             for card in data.get("cards", [])

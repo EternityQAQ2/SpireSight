@@ -93,6 +93,27 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["shop:proceed"])
         self.assertEqual(context.candidates[0].action_type, "proceed")
 
+    def test_ready_upgrade_selection_only_exposes_confirm(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "hand_select",
+                "run": {"act": 1, "floor": 2},
+                "player": {},
+                "hand_select": {
+                    "mode": "upgrade_select",
+                    "cards": [
+                        {"index": 0, "name": "Strike"},
+                        {"index": 1, "name": "Defend"},
+                    ],
+                    "selected_cards": [{"index": 0, "name": "Strike"}],
+                    "can_confirm": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["hand_select:confirm"])
+        self.assertEqual(context.candidates[0].action_type, "combat_confirm_selection")
+
 
 if __name__ == "__main__":
     unittest.main()
