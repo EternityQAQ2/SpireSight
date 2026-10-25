@@ -3,6 +3,7 @@ name = "sts2-advisor"
 version = "0.1.0"
 description = "Read-only Slay the Spire 2 decision advisor"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = []
 
