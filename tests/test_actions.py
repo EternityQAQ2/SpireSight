@@ -138,6 +138,58 @@ class ActionExecutorTests(unittest.TestCase):
                 ("POST", "/api/v1/singleplayer", {"action": "play_card", "card_index": 2}),
             ])
 
+    def test_executor_retries_idempotent_rejected_action_once(self):
+        raw = {"state_type": "rewards", "run": {}, "player": {},
+               "rewards": {"items": [], "can_proceed": True}}
+        context = build_decision_context(raw)
+        assert context is not None
+        advice = Advice(context.decision_id, "reward:proceed", "test", 1.0)
+        messages: list[str] = []
+        with action_api(
+            states=[raw],
+            post_body=b'{"status":"error","error":"inventory is open but could not be closed"}',
+        ) as (client, requests):
+            executor = ActionExecutor(client, output=messages.append)
+            self.assertIsNone(executor.execute(advice, context))
+            self.assertTrue(any("重试一次" in line for line in messages))
+            with self.assertRaisesRegex(Sts2ApiError, "could not be closed"):
+                executor.execute(advice, context)
+            self.assertIsNone(executor.execute(advice, context))
+            self.assertEqual(
+                [request for request in requests if request[0] == "POST"],
+                [("POST", "/api/v1/singleplayer", {"action": "proceed"})] * 2,
+            )
+
+    def test_executor_does_not_retry_non_idempotent_rejected_action(self):
+        context = build_decision_context(COMBAT)
+        assert context is not None
+        advice = Advice(context.decision_id, "card:2", "test", 1.0)
+        with action_api(
+            states=[COMBAT], post_body=b'{"status":"error","error":"Not enough gold"}',
+        ) as (client, requests):
+            executor = ActionExecutor(client, output=lambda text: None)
+            with self.assertRaisesRegex(Sts2ApiError, "Not enough gold"):
+                executor.execute(advice, context)
+            self.assertIsNone(executor.execute(advice, context))
+            self.assertEqual(
+                [request for request in requests if request[0] == "POST"],
+                [("POST", "/api/v1/singleplayer", {"action": "play_card", "card_index": 2})],
+            )
+
+    def test_executor_does_not_retry_when_post_outcome_is_unknown(self):
+        raw = {"state_type": "rewards", "run": {}, "player": {},
+               "rewards": {"items": [], "can_proceed": True}}
+        context = build_decision_context(raw)
+        assert context is not None
+        advice = Advice(context.decision_id, "reward:proceed", "test", 1.0)
+        with action_api(states=[raw]) as (client, requests), \
+                patch("sts2_advisor.action.urlopen", side_effect=RemoteDisconnected("response lost")):
+            executor = ActionExecutor(client, output=lambda text: None)
+            with self.assertRaisesRegex(Sts2ApiError, "response lost"):
+                executor.execute(advice, context)
+            self.assertIsNone(executor.execute(advice, context))
+            self.assertEqual([request for request in requests if request[0] == "POST"], [])
+
 
 class AutomaticActionTests(unittest.TestCase):
     def service(self, client, *, auto_act=True):

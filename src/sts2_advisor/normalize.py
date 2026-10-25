@@ -106,13 +106,28 @@ def compact_card(card: dict[str, Any]) -> dict[str, Any]:
 
 
 def compact_pile(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    counts: Counter[tuple[str, str, str]] = Counter()
+    counts: Counter[tuple[str, bool]] = Counter()
+    details: dict[tuple[str, bool], dict[str, Any]] = {}
     for card in cards:
-        counts[(str(card.get("name", "?")), str(card.get("cost", "?")), str(card.get("description", "")))] += 1
+        identity = card_identity(card)
+        counts[identity] += 1
+        details.setdefault(identity, {
+            "id": card.get("id"),
+            "name": card.get("name"),
+            "cost": card.get("cost"),
+            "description": card.get("description", ""),
+        })
     return [
-        {"name": name, "cost": cost, "description": description, "count": count}
-        for (name, cost, description), count in sorted(counts.items())
+        {
+            field: value for field, value in details[identity].items() if value is not None
+        } | {"is_upgraded": identity[1], "count": count}
+        for identity, count in sorted(counts.items())
     ]
+
+
+def card_identity(card: dict[str, Any]) -> tuple[str, bool]:
+    """Aggregate by card identity; name fallback covers pile entries without id."""
+    return (str(card.get("id") or card.get("name") or "?"), bool(card.get("is_upgraded")))
 
 
 def compact_situation(raw: dict[str, Any]) -> dict[str, Any]:
@@ -130,7 +145,12 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return combat_candidates(raw)
     if state_type == "hand_select":
         data = raw.get("hand_select", {})
-        if data.get("mode") == "upgrade_select" and data.get("can_confirm"):
+        # Once the game reports a selected card and enables confirmation, the
+        # selection requirement has been satisfied. Collapse the candidate set
+        # to the confirm action so the model cannot toggle between cards forever.
+        # Exact multi-card prompts keep can_confirm false until enough cards are
+        # selected; optional "up to N" prompts may confirm early, which is legal.
+        if data.get("selected_cards") and data.get("can_confirm"):
             return [Candidate("hand_select:confirm", "combat_confirm_selection", "确认选择")]
         result = [
             Candidate(f"hand_select:{card['index']}", "combat_select_card", card.get("name", "选择卡牌"), {"card_index": card["index"]})
@@ -142,11 +162,28 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         return result
     if state_type == "rewards":
         data = raw.get("rewards", {})
-        result = [
-            Candidate(f"reward:{item['index']}", "claim_reward", item.get("description", item.get("type", "奖励")), {"index": item["index"]})
-            for item in data.get("items", [])
-            if "index" in item
+        # Combat rewards are all beneficial and should be collected without
+        # spending a model call. Expose exactly one action at a time so the
+        # generic deterministic path executes it, using the highest index to
+        # remain safe when claiming a reward shifts the remaining indices.
+        indexed_items = [item for item in data.get("items", []) if "index" in item]
+        player = raw.get("player", {})
+        potions = [potion for potion in player.get("potions", []) if "slot" in potion]
+        max_slots = player.get("max_potion_slots")
+        potion_slots_full = isinstance(max_slots, int) and max_slots > 0 and len(potions) >= max_slots
+        claimable_items = [
+            item for item in indexed_items
+            if not (item.get("type") == "potion" and potion_slots_full)
         ]
+        if claimable_items:
+            item = max(claimable_items, key=lambda value: int(value["index"]))
+            return [Candidate(
+                f"reward:{item['index']}",
+                "claim_reward",
+                item.get("description", item.get("type", "奖励")),
+                {"index": item["index"]},
+            )]
+        result = []
         if data.get("can_proceed"):
             result.append(Candidate("reward:proceed", "proceed", "离开奖励界面"))
         return result
@@ -157,8 +194,6 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
             for card in data.get("cards", [])
             if "index" in card
         ]
-        if data.get("can_skip"):
-            result.append(Candidate("card_reward:skip", "skip_card_reward", "跳过选牌"))
         return result
     if state_type == "map":
         return [

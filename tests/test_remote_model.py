@@ -91,9 +91,11 @@ class RemoteModelTests(unittest.TestCase):
         self.assertEqual(calls[0]["response_format"], {"type": "json_object"})
         self.assertEqual(calls[0]["extra_body"], {"thinking": {"type": "disabled"}})
 
-    def test_prompt_omits_low_value_metadata_and_pile_descriptions(self) -> None:
+    def test_prompt_puts_deck_codex_in_stable_prefix_and_shrinks_dynamic_region(self) -> None:
         raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
-        raw["player"]["draw_pile"][0]["description"] = "牌堆独有的冗长说明"
+        raw["player"]["draw_pile"].append(
+            {"name": "灼热攻击", "cost": "1", "description": "牌堆独有的冗长说明"}
+        )
         context = build_decision_context(raw)
         assert context is not None
         evidence = Evidence(
@@ -103,7 +105,7 @@ class RemoteModelTests(unittest.TestCase):
         prompt = build_prompt(context, [evidence])
         self.assertIn("核心事实", prompt)
         self.assertNotIn("should-not-be-sent", prompt)
-        self.assertNotIn("牌堆独有的冗长说明", prompt)
+        self.assertEqual(prompt.count("牌堆独有的冗长说明"), 1)
         self.assertLess(prompt.index('"evidence"'), prompt.index('"decision_id"'))
 
         payload = json.loads(prompt.removeprefix("输入 JSON："))
@@ -113,9 +115,31 @@ class RemoteModelTests(unittest.TestCase):
         )
         self.assertNotIn("run", payload["stable"])
 
+        deck = payload["stable"]["deck"]
+        codex_keys = {entry["k"] for entry in deck}
+        self.assertIn("STRIKE_IRONCLAD", codex_keys)
+        self.assertEqual([entry["k"] for entry in deck], sorted(codex_keys))
+        strike = next(entry for entry in deck if entry["k"] == "STRIKE_IRONCLAD")
+        self.assertEqual(strike["description"], "造成6点伤害。")
+
+        hand = payload["player"]["hand"]
+        self.assertTrue(hand)
+        for entry in hand:
+            self.assertNotIn("description", entry)
+            self.assertIn("k", entry)
+            self.assertIn(entry["k"], codex_keys)
+        draw_pile = payload["player"]["draw_pile"]
+        self.assertTrue(all(isinstance(value, int) for value in draw_pile.values()))
+        self.assertTrue(set(draw_pile) <= codex_keys)
+        # 牌堆卡没有 id 字段，应通过名称统一到手牌卡的 id 键，避免图鉴分裂。
+        self.assertEqual(draw_pile, {"DEFEND_IRONCLAD": 2, "灼热攻击": 1})
+        self.assertNotIn("防御", codex_keys)
+        self.assertIn("灼热攻击", codex_keys)
+
     def test_system_prompt_keeps_json_contract_without_redundant_formatting_rules(self) -> None:
         self.assertIn("返回 JSON 对象", SYSTEM_PROMPT)
         self.assertIn('"plan_candidate_ids"', SYSTEM_PROMPT)
+        self.assertIn("图鉴", SYSTEM_PROMPT)
         self.assertNotIn("不要使用 Markdown", SYSTEM_PROMPT)
         self.assertNotIn("输出紧凑 JSON", SYSTEM_PROMPT)
 

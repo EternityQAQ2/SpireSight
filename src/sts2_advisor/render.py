@@ -25,6 +25,6 @@ def render_console(advice: Advice, context: DecisionContext, evidence: list[Evid
         lines.append("依据：" + "；".join(sources))
     for warning in advice.warnings:
         lines.append("注意：" + warning)
-    lines.append(f"动作标识：{selected.candidate_id}（只读建议，未执行）")
+    lines.append(f"动作标识：{selected.candidate_id}")
     return "\n".join(lines)
 

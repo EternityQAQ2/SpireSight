@@ -15,6 +15,10 @@ class Sts2ApiError(RuntimeError):
     pass
 
 
+class Sts2ActionRejectedError(Sts2ApiError):
+    """服务器已处理请求并明确拒绝该动作（status != ok），动作未执行。"""
+
+
 class Sts2RestClient:
     def __init__(self, base_url: str = "http://localhost:15526", timeout: float = 5.0) -> None:
         self.base_url = base_url.rstrip("/")

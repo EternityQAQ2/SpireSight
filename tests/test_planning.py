@@ -69,6 +69,36 @@ class PlanningTests(unittest.TestCase):
         assert current is not None
         self.assertIsNone(self.make_plan().advance(current))
 
+    def test_plan_survives_mid_turn_card_text_mutation(self) -> None:
+        raw = self.state_after_first_card()
+        for card in raw["player"]["hand"]:
+            card["description"] = "力量变化改写了卡牌说明"
+            card["cost"] = "X"
+        current = build_decision_context(raw)
+        assert current is not None
+        advice = self.make_plan().advance(current)
+        self.assertIsNotNone(advice)
+
+    def test_plan_delivers_final_end_turn_step(self) -> None:
+        end_turn = next(
+            item for item in self.context.candidates if item.candidate_id == "combat:end_turn"
+        )
+        advice = Advice(
+            self.context.decision_id,
+            self.first.candidate_id,
+            "出牌后结束回合",
+            0.8,
+            plan_candidate_ids=[self.first.candidate_id, end_turn.candidate_id],
+        )
+        plan = ActivePlan.from_advice(validate_advice(advice, self.context, []), self.context, [])
+        assert plan is not None
+        current = build_decision_context(self.state_after_first_card())
+        assert current is not None
+        cached = plan.advance(current)
+        self.assertIsNotNone(cached)
+        assert cached is not None
+        self.assertEqual(cached.candidate_id, end_turn.candidate_id)
+
     def test_recognizes_multiple_manually_completed_plan_steps(self) -> None:
         third = self.playable[2]
         advice = Advice(
