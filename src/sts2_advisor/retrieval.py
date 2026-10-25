@@ -4,6 +4,7 @@ from __future__ import annotations
 '''
 import json
 import math
+import os
 import re
 import sqlite3
 from contextlib import closing
@@ -12,6 +13,18 @@ from typing import Any, Protocol
 
 from .domain import DecisionContext, Evidence
 from .record import record_event
+
+
+# 语料以中文攻略为主，默认嵌入模型用中文 BGE；换模型只需设置同名环境变量。
+# 注意：更换模型后必须删除 data/chroma 并重新入库，否则查询与文档向量不一致。
+EMBEDDING_MODEL = os.environ.get("STS2_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+
+
+def chroma_embedding_function():
+    """ingest 与查询共用的 sentence-transformers 嵌入函数（懒加载，rag 可选依赖）。"""
+    from chromadb.utils import embedding_functions
+
+    return embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
 
 
 class Retriever(Protocol):
@@ -74,7 +87,8 @@ class ChromaRetriever:
         except ImportError as exc:
             raise RuntimeError("未安装 chromadb；请安装 rag 可选依赖或使用 JSONL 回退知识库") from exc
         self.collection = chromadb.PersistentClient(path=str(path)).get_or_create_collection(
-            name=collection_name
+            name=collection_name,
+            embedding_function=chroma_embedding_function(),
         )
 
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
@@ -90,9 +104,7 @@ class ChromaRetriever:
         metadatas = (result.get("metadatas") or [[]])[0]
         for evidence_id, text, metadata in zip(ids, documents, metadatas):
             metadata = metadata or {}
-            decision_types = str(metadata.get("decision_types", "")).split(",")
-            decision_type = str(metadata.get("decision_type", ""))
-            if decision_type not in {"", "all", context.decision_type} and context.decision_type not in decision_types:
+            if not metadata_matches(metadata, context):
                 continue
             evidences.append(
                 Evidence(
@@ -248,12 +260,18 @@ def build_query(context: DecisionContext) -> str:
 
 
 def metadata_matches(metadata: dict[str, Any], context: DecisionContext) -> bool:
+    """JSONL（列表）与 Chroma（逗号字符串）元数据共用的过滤规则。
+
+    decision_types 为空或含 "all" 表示不限；否则必须精确包含当前决策类型。
+    旧实现把单值 decision_type="all" 当通配符，导致标注 card_reward+shop 的
+    攻略泄漏进地图/战斗等所有决策；现在以 decision_types 列表为唯一裁决。
+    """
     decision_types = metadata.get("decision_types")
-    if isinstance(decision_types, list) and context.decision_type not in decision_types:
-        return False
-    decision_type = metadata.get("decision_type")
-    if decision_type and decision_type != context.decision_type:
-        return False
+    if isinstance(decision_types, str):
+        decision_types = [item for item in decision_types.split(",") if item]
+    if isinstance(decision_types, list) and decision_types:
+        if "all" not in decision_types and context.decision_type not in decision_types:
+            return False
     character = metadata.get("character")
     if character and character not in {context.player.get("character"), "all", "*"}:
         return False

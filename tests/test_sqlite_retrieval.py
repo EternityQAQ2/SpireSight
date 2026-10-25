@@ -8,10 +8,45 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
+from sts2_advisor.domain import DecisionContext
 from sts2_advisor.model import build_prompt
 from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.retrieval import SqliteFactsRetriever, create_retriever
+from sts2_advisor.retrieval import SqliteFactsRetriever, create_retriever, metadata_matches
 from tools.build_wiki_db import SCHEMA_SQL
+
+
+def make_context(decision_type: str, character: str = "铁甲战士") -> DecisionContext:
+    return DecisionContext(
+        "1.0", "test", decision_type, decision_type, {},
+        {"character": character}, {}, [],
+    )
+
+
+class MetadataFilterTests(unittest.TestCase):
+    def test_chroma_multi_type_metadata_only_matches_listed_types(self) -> None:
+        # ingest 多类型时写入 decision_type="all"，过滤不得把它当通配符
+        metadata = {"decision_type": "all", "decision_types": "card_reward,shop",
+                    "character": "铁甲战士"}
+        self.assertTrue(metadata_matches(metadata, make_context("card_reward")))
+        self.assertTrue(metadata_matches(metadata, make_context("shop")))
+        self.assertFalse(metadata_matches(metadata, make_context("map")))
+        self.assertFalse(metadata_matches(metadata, make_context("combat_next_action")))
+
+    def test_chroma_character_filter(self) -> None:
+        metadata = {"decision_types": "card_reward", "character": "故障机器人"}
+        self.assertTrue(metadata_matches(metadata, make_context("card_reward", "故障机器人")))
+        self.assertFalse(metadata_matches(metadata, make_context("card_reward", "铁甲战士")))
+        self.assertFalse(
+            metadata_matches(metadata, make_context("map", "故障机器人")))
+
+    def test_jsonl_list_metadata_still_matches(self) -> None:
+        metadata = {"decision_types": ["card_reward", "shop"], "character": "all"}
+        self.assertTrue(metadata_matches(metadata, make_context("shop")))
+        self.assertFalse(metadata_matches(metadata, make_context("event")))
+
+    def test_empty_or_all_metadata_matches_everything(self) -> None:
+        self.assertTrue(metadata_matches({}, make_context("map")))
+        self.assertTrue(metadata_matches({"decision_types": "all"}, make_context("event")))
 
 
 class SqliteRetrievalTests(unittest.TestCase):

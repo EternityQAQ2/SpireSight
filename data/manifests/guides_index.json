@@ -1,0 +1,235 @@
+{
+  "generated_at": "2026-10-25T10:43:50.452993+00:00",
+  "guides_dir": "guides",
+  "decision_types": [
+    "card_reward",
+    "shop"
+  ],
+  "entries": [
+    {
+      "path": "guides\\builds\\亡灵契约师流派\\奥斯提召唤.md",
+      "category": "builds",
+      "group": "亡灵契约师流派",
+      "character": "亡灵契约师",
+      "title": "亡灵契约师：奥斯提召唤",
+      "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-osty",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\亡灵契约师流派\\死神重击.md",
+      "category": "builds",
+      "group": "亡灵契约师流派",
+      "character": "亡灵契约师",
+      "title": "亡灵契约师：死神重击",
+      "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-reaper-big-hit",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\亡灵契约师流派\\灵魂循环.md",
+      "category": "builds",
+      "group": "亡灵契约师流派",
+      "character": "亡灵契约师",
+      "title": "亡灵契约师：灵魂循环",
+      "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-soul-cycle",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\亡灵契约师流派\\灾厄斩杀.md",
+      "category": "builds",
+      "group": "亡灵契约师流派",
+      "character": "亡灵契约师",
+      "title": "亡灵契约师：灾厄斩杀",
+      "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-doom-execute",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\亡灵契约师流派\\虚无流.md",
+      "category": "builds",
+      "group": "亡灵契约师流派",
+      "character": "亡灵契约师",
+      "title": "亡灵契约师：虚无流",
+      "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-ethereal",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\储君流派\\君王之剑铸造流.md",
+      "category": "builds",
+      "group": "储君流派",
+      "character": "储君",
+      "title": "储君：君王之剑铸造流",
+      "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-sovereign-blade-forge",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\储君流派\\星位序列循环.md",
+      "category": "builds",
+      "group": "储君流派",
+      "character": "储君",
+      "title": "储君：星位序列循环",
+      "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-alignment-loop",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\储君流派\\虚空形态流.md",
+      "category": "builds",
+      "group": "储君流派",
+      "character": "储君",
+      "title": "储君：虚空形态流",
+      "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-void-form",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\储君流派\\辉星引擎.md",
+      "category": "builds",
+      "group": "储君流派",
+      "character": "储君",
+      "title": "储君：辉星引擎",
+      "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-star-engine",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\储君流派\\造牌流.md",
+      "category": "builds",
+      "group": "储君流派",
+      "character": "储君",
+      "title": "储君：造牌流",
+      "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-card-creation",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\故障机器人流派\\0 费 Claw 流.md",
+      "category": "builds",
+      "group": "故障机器人流派",
+      "character": "故障机器人",
+      "title": "故障机器人：0 费 Claw 流",
+      "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-claw-zero-cost",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\故障机器人流派\\冰霜集中球.md",
+      "category": "builds",
+      "group": "故障机器人流派",
+      "character": "故障机器人",
+      "title": "故障机器人：冰霜集中球",
+      "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-frost-focus-orbs",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\故障机器人流派\\状态牌引擎.md",
+      "category": "builds",
+      "group": "故障机器人流派",
+      "character": "故障机器人",
+      "title": "故障机器人：状态牌引擎",
+      "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-status-engine",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\故障机器人流派\\闪电能力引擎.md",
+      "category": "builds",
+      "group": "故障机器人流派",
+      "character": "故障机器人",
+      "title": "故障机器人：闪电能力引擎",
+      "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-lightning-power-engine",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\故障机器人流派\\黑暗球激发爆发.md",
+      "category": "builds",
+      "group": "故障机器人流派",
+      "character": "故障机器人",
+      "title": "故障机器人：黑暗球激发爆发",
+      "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-dark-orb-evoke-burst",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\铁甲战士流派\\力量流.md",
+      "category": "builds",
+      "group": "铁甲战士流派",
+      "character": "铁甲战士",
+      "title": "铁甲战士：力量流",
+      "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-strength-scaling",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\铁甲战士流派\\易伤流.md",
+      "category": "builds",
+      "group": "铁甲战士流派",
+      "character": "铁甲战士",
+      "title": "铁甲战士：易伤流",
+      "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-vulnerable",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\铁甲战士流派\\格挡／全身撞击流.md",
+      "category": "builds",
+      "group": "铁甲战士流派",
+      "character": "铁甲战士",
+      "title": "铁甲战士：格挡／全身撞击流",
+      "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-block-barricade",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\铁甲战士流派\\消耗流.md",
+      "category": "builds",
+      "group": "铁甲战士流派",
+      "character": "铁甲战士",
+      "title": "铁甲战士：消耗流",
+      "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-exhaust-engine",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\铁甲战士流派\\自伤流.md",
+      "category": "builds",
+      "group": "铁甲战士流派",
+      "character": "铁甲战士",
+      "title": "铁甲战士：自伤流",
+      "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-self-damage",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\静默猎手流派\\中毒流.md",
+      "category": "builds",
+      "group": "静默猎手流派",
+      "character": "静默猎手",
+      "title": "静默猎手：中毒流",
+      "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-poison",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\静默猎手流派\\奇巧弃牌流.md",
+      "category": "builds",
+      "group": "静默猎手流派",
+      "character": "静默猎手",
+      "title": "静默猎手：奇巧弃牌流",
+      "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-sly-discard",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\静默猎手流派\\小刀流.md",
+      "category": "builds",
+      "group": "静默猎手流派",
+      "character": "静默猎手",
+      "title": "静默猎手：小刀流",
+      "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-shiv",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\静默猎手流派\\敏捷格挡流.md",
+      "category": "builds",
+      "group": "静默猎手流派",
+      "character": "静默猎手",
+      "title": "静默猎手：敏捷格挡流",
+      "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-dexterity-block",
+      "license": "slaythespire2.net，未标注"
+    },
+    {
+      "path": "guides\\builds\\静默猎手流派\\过牌节奏流.md",
+      "category": "builds",
+      "group": "静默猎手流派",
+      "character": "静默猎手",
+      "title": "静默猎手：过牌节奏流",
+      "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-draw-tempo",
+      "license": "slaythespire2.net，未标注"
+    }
+  ]
+}
