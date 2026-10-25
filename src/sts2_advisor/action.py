@@ -13,11 +13,16 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from .api import Sts2ApiError, Sts2RestClient
+from .api import Sts2ActionRejectedError, Sts2ApiError, Sts2RestClient
 from .domain import Advice, DecisionContext
 from .normalize import build_decision_context
 from .record import record_event
 from .validation import AdviceValidationError
+
+
+# 纯界面导航类动作，重复发送最坏只得到一次无害报错，可在被明确拒绝后安全重试一次；
+# 购买、出牌等改变游戏状态的动作一旦发出绝不重发。
+IDEMPOTENT_RETRY_ACTION_TYPES = {"proceed", "end_turn"}
 
 
 def action(
@@ -78,7 +83,7 @@ def action(
         raise Sts2ApiError("STS2MCP 响应必须是 JSON 对象")
     if payload.get("status") != "ok":
         message = payload.get("error") or payload.get("message") or "响应缺少有效的 status: ok"
-        raise Sts2ApiError(f"STS2MCP 动作 {action_type} 未确认成功：{message}")
+        raise Sts2ActionRejectedError(f"STS2MCP 动作 {action_type} 未确认成功：{message}")
     return payload
 
 
@@ -89,6 +94,7 @@ class ActionExecutor:
         self.client = client
         self.output = output
         self.last_decision_id: str | None = None
+        self._retried_decision_id: str | None = None
 
     def execute(self, advice: Advice, context: DecisionContext) -> dict[str, Any] | None:
         """校验推荐与最新局面后发送；重复或过期局面返回 None。"""
@@ -112,7 +118,23 @@ class ActionExecutor:
             return None
 
         # 预检 GET 失败可重试；POST 已发出后，即使响应丢失也不对同一状态重发。
+        # 唯一例外：服务器明确拒绝（动作未执行）且动作幂等时，允许重试一次，
+        # 避免界面类故障（如关闭商店失败）让自动执行永久卡死在同一局面。
         self.last_decision_id = context.decision_id
-        result = action(candidate.action_type, client=self.client, **candidate.params)
+        try:
+            result = action(candidate.action_type, client=self.client, **candidate.params)
+        except Sts2ActionRejectedError as exc:
+            retryable = (
+                candidate.action_type in IDEMPOTENT_RETRY_ACTION_TYPES
+                and self._retried_decision_id != context.decision_id
+            )
+            record_event("action.rejected", decision_id=context.decision_id,
+                         action_type=candidate.action_type, retryable=retryable, message=str(exc))
+            if not retryable:
+                raise
+            self._retried_decision_id = context.decision_id
+            self.last_decision_id = None
+            self.output(f"动作 {candidate.candidate_id} 被游戏拒绝：{exc}；幂等动作将在下一次轮询重试一次。")
+            return None
         self.output(f"已发送动作 {candidate.candidate_id}：{result.get('message') or 'ok'}")
         return result

@@ -313,11 +313,12 @@ def message_text(value) -> str:
 
 
 SYSTEM_PROMPT = """你是《杀戮尖塔2》决策建议器。输入含状态、合法动作 candidates 和证据 evidence。
+stable.deck 是卡牌图鉴：手牌与牌堆只给出图鉴键 k（末尾 + 表示已升级）及数量，卡牌效果一律查图鉴；图鉴之外的卡（商店、奖励等）在其界面数据中自带说明。
 规则：
 1. 所有动作 ID 必须逐字来自 candidates；candidate_id 是 plan_candidate_ids 首项，计划共 1 至 8 步。
-2. 战斗可规划当前手牌、能量下确定的连续动作；遇抽牌、随机、手牌变化、选择界面或目标可能提前死亡即停止。
+2. 战斗中能量与手牌允许时应规划 2 至 8 步连续动作，并以 combat:end_turn 收尾；下一步会抽牌、生成或消耗手牌、结果随机或目标可能提前死亡时必须停止，之后的局面会重新决策。
 3. 商店可按余额连续购买；奖励可连续领取确定项，打开选牌时停止。
-4. 地图、事件、选牌、休息点只规划当前一步。
+4. 地图、事件、选牌、休息点只规划当前一步。地图 nodes 每项为 [列,行,类型,子节点[[列,行]…]]，visited 已省略为 visited_count。选择类界面（card_select/hand_select）中已选卡不会出现在 candidates；选择已满足要求时直接输出 confirm 候选，candidate_id 与 alternative_ids 都不得引用已选卡。
 5. 只依据输入；证据不足则降低 confidence，不虚构效果。reason 不超过 80 个汉字，不输出思维过程。
 返回 JSON 对象，必须且只能包含：
 {"decision_id":"输入值","candidate_id":"动作ID","reason":"理由","confidence":0.0,"alternative_ids":[],"evidence_ids":[],"warnings":[],"plan_candidate_ids":["动作ID"]}
@@ -337,7 +338,10 @@ def build_prompt(context: DecisionContext, evidence: list[Evidence]) -> str:
 def model_context_payload(context: DecisionContext) -> dict:
     """Build a smaller prompt with stable fields first for provider prefix caching."""
     player = context.player
-    relics = player.get("relics", [])
+    relics = sorted(
+        player.get("relics", []),
+        key=lambda item: str(item.get("id") or item.get("name") or ""),
+    )
     stable = {
         "character": player.get("character"),
         "max_hp": player.get("max_hp"),
@@ -346,6 +350,9 @@ def model_context_payload(context: DecisionContext) -> dict:
             compact_fields(item, ("id", "name", "description")) for item in relics
         ],
     }
+    deck = deck_codex(player, context.run)
+    if deck:
+        stable["deck"] = deck
     dynamic_player = compact_fields(
         player, ("hp", "block", "energy", "gold", "status", "potions", "max_potion_slots")
     )
@@ -353,12 +360,9 @@ def model_context_payload(context: DecisionContext) -> dict:
         {"id": item.get("id"), "counter": item.get("counter")}
         for item in relics if item.get("counter") is not None
     ]
-    dynamic_player["hand"] = player.get("hand", [])
+    dynamic_player["hand"] = [compact_hand_card(card) for card in player.get("hand", [])]
     for pile in ("draw_pile", "discard_pile", "exhaust_pile"):
-        dynamic_player[pile] = [
-            compact_fields(card, ("name", "cost", "count"))
-            for card in player.get(pile, [])
-        ]
+        dynamic_player[pile] = pile_counts(player.get(pile, []))
     return {
         "stable": stable,
         "run": context.run,
@@ -370,6 +374,77 @@ def model_context_payload(context: DecisionContext) -> dict:
             {"id": item.candidate_id, "label": item.label} for item in context.candidates
         ],
     }
+
+
+def card_key(card: dict) -> str:
+    """名称优先的图鉴键：手牌卡与牌堆条目都带名称（牌堆 API 没有 id），
+    卡牌在手牌与牌堆间移动时键保持不变，图鉴才可能被前缀缓存命中。"""
+    name = str(card.get("name") or card.get("id") or "")
+    return name + ("+" if card.get("is_upgraded") else "")
+
+
+# 图鉴按 (角色, 幕, 层) 冻结：条目首见即定型，新卡只追加到尾部。
+# 出牌/抽牌/进堆不会改动任何已有条目，保证战斗内请求的静态前缀逐字节稳定；
+# 层号前进时整体重建，卡组变化（拿卡/删卡）天然生效。
+_FIGHT_CODEX: dict[tuple[str, str, str], dict[str, dict]] = {}
+
+
+def clear_codex_cache() -> None:
+    _FIGHT_CODEX.clear()
+
+
+def deck_codex(player: dict, run: dict) -> list[dict]:
+    sources = [
+        *player.get("hand", []),
+        *player.get("draw_pile", []),
+        *player.get("discard_pile", []),
+        *player.get("exhaust_pile", []),
+    ]
+    if not sources:
+        return []
+    key = (
+        str(player.get("character") or ""),
+        str(run.get("act")),
+        str(run.get("floor")),
+    )
+    entries = _FIGHT_CODEX.get(key)
+    if entries is None:
+        _FIGHT_CODEX.clear()
+        entries = _FIGHT_CODEX[key] = {}
+    for card in sources:
+        key_name = card_key(card)
+        if not key_name or key_name in entries:
+            continue
+        entry = {
+            "k": key_name,
+            "name": card.get("name"),
+            "type": card.get("type"),
+            "cost": card.get("cost"),
+            "description": card.get("description", ""),
+        }
+        entries[key_name] = {field: value for field, value in entry.items() if value is not None}
+    # 插入序输出：已有条目顺序不变，新卡追加在尾部，前缀缓存可完整复用。
+    return list(entries.values())
+
+
+def compact_hand_card(card: dict) -> dict:
+    entry = {
+        "k": card_key(card),
+        "cost": card.get("cost"),
+        "can": card.get("can_play", True),
+    }
+    if not card.get("can_play", True) and card.get("unplayable_reason"):
+        entry["why"] = card.get("unplayable_reason")
+    return entry
+
+
+def pile_counts(cards: list[dict]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for card in cards:
+        key = card_key(card)
+        if key:
+            counts[key] = counts.get(key, 0) + int(card.get("count", 1))
+    return counts
 
 
 def compact_fields(value: dict, fields: tuple[str, ...]) -> dict:
@@ -404,6 +479,18 @@ def advice_from_payload(payload: dict, context: DecisionContext) -> Advice:
 
 
 def choose_rule_candidate(context: DecisionContext):
+    # 选择类界面出现 confirm 候选说明当前选择已可提交；回退必须直接确认，
+    # 否则会盲目再选一张卡，把多选界面一路推向全选（附魔事件曾因此卡死）。
+    confirm = next(
+        (
+            candidate
+            for candidate in context.candidates
+            if candidate.action_type in {"confirm_selection", "combat_confirm_selection"}
+        ),
+        None,
+    )
+    if confirm is not None:
+        return confirm
     if context.decision_type == "combat_next_action":
         player = context.player
         incoming = incoming_damage(context.situation)

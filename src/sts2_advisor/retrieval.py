@@ -147,12 +147,16 @@ class SqliteFactsRetriever:
 
         # 牌堆中的卡当前不能直接操作；用它们扩展 SQLite 查询只会把无关卡牌
         # 事实塞进战斗提示词。检索只覆盖本回合可见、会影响当前决策的实体。
-        collect({
-            "hand": context.player.get("hand", []),
+        visible = {
             "relics": context.player.get("relics", []),
             "potions": context.player.get("potions", []),
             "status": context.player.get("status", []),
-        })
+        }
+        # 战斗中手牌效果由提示词的牌组图鉴提供（游戏自带描述），这里不再查询，
+        # 避免与图鉴重复占用证据槽位；其余界面（选牌、商店等）仍按手牌查询。
+        if context.decision_type != "combat_next_action":
+            visible["hand"] = context.player.get("hand", [])
+        collect(visible)
         collect(context.situation)
         identifiers, labels = sorted(ids), sorted(names)
         record_event("retrieval.query", provider="sqlite", path=str(self.path), top_k=top_k,

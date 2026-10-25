@@ -21,9 +21,9 @@ def validate_advice(
     if advice.candidate_id not in candidate_ids:
         raise AdviceValidationError(f"模型选择了非法候选: {advice.candidate_id}")
 
-    invalid_alternatives = set(advice.alternative_ids) - candidate_ids
-    if invalid_alternatives:
-        raise AdviceValidationError(f"模型返回了非法备选: {sorted(invalid_alternatives)}")
+    # 备选只用于展示，出现非法项时丢弃并警告，而不是作废整个合法建议；
+    # 曾因模型把已选卡写进 alternative_ids 触发回退，导致选择界面被推成全选。
+    dropped_alternatives = set(advice.alternative_ids) - candidate_ids
 
     evidence_ids = {item.evidence_id for item in evidence}
     invalid_evidence = set(advice.evidence_ids) - evidence_ids
@@ -52,6 +52,8 @@ def validate_advice(
     alternative_ids: list[str] = []
     alternative_labels: set[str] = set()
     for candidate_id in advice.alternative_ids:
+        if candidate_id in dropped_alternatives:
+            continue
         label = candidate_labels[candidate_id]
         if candidate_id == advice.candidate_id or label == selected_label or label in alternative_labels:
             continue
@@ -60,13 +62,18 @@ def validate_advice(
         if len(alternative_ids) == 2:
             break
 
+    warnings = list(dict.fromkeys(advice.warnings))
+    if dropped_alternatives:
+        warning = "模型返回了非法备选，已忽略：" + ",".join(sorted(dropped_alternatives))
+        warnings = [warning] + warnings
+
     return replace(
         advice,
         reason=reason,
         confidence=max(0.0, min(1.0, advice.confidence)),
         alternative_ids=alternative_ids,
         evidence_ids=list(dict.fromkeys(advice.evidence_ids))[:6],
-        warnings=list(dict.fromkeys(advice.warnings))[:4],
+        warnings=warnings[:4],
         plan_candidate_ids=plan_candidate_ids[:8],
     )
 

@@ -48,11 +48,11 @@ class ActivePlan:
 
     def advance(self, context: DecisionContext) -> Advice | None:
         """Consume the previous step and rebind the remaining plan to current indices."""
-        if context.decision_type != self.decision_type or len(self.pending) < 2:
+        if context.decision_type != self.decision_type or not self.pending:
             return None
 
         resolved: list[Candidate] | None = None
-        for completed_count in range(len(self.pending) - 1, 0, -1):
+        for completed_count in range(len(self.pending), 0, -1):
             completed = self.pending[:completed_count]
             if not transition_sequence_is_safe(self.previous_context, completed, context):
                 continue
@@ -64,10 +64,10 @@ class ActivePlan:
                     break
                 rebound.append(candidate)
                 available.remove(candidate)
-            else:
+            if rebound:
                 resolved = rebound
                 break
-        if not resolved:
+        if resolved is None:
             return None
 
         self.pending = [step_from_candidate(item) for item in resolved]
@@ -222,10 +222,7 @@ def combat_transition_is_safe(
 
 
 def card_signature(card: dict) -> tuple:
-    return (
-        card.get("id"),
-        card.get("name"),
-        card.get("cost"),
-        card.get("description"),
-        bool(card.get("is_upgraded")),
-    )
+    """Compare by identity only: mid-turn text mutations (力量/敏捷变化改写卡牌
+    费用或说明) must not invalidate an otherwise safe plan; the remaining steps
+    are re-validated against the current candidates anyway."""
+    return (card.get("id") or card.get("name"), bool(card.get("is_upgraded")))

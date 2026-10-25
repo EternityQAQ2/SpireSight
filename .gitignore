@@ -126,3 +126,5 @@ chroma.sqlite3
 !data/manifests/**
 !tests/fixtures/
 !tests/fixtures/**
+
+docs_agents/
