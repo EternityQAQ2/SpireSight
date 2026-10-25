@@ -5,7 +5,9 @@ description = "Read-only Slay the Spire 2 decision advisor"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "sentence-transformers>=6.2.0",
+]
 
 [project.optional-dependencies]
 model = ["torch>=2.5", "transformers>=4.57", "accelerate>=1.0"]

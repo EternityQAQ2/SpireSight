@@ -14,7 +14,14 @@ from unittest.mock import patch
 from sts2_advisor.cli import choose_backend_interactively, environment_flag, load_environment
 from sts2_advisor.domain import Evidence
 from sts2_advisor.logging_config import close_logging, configure_logging
-from sts2_advisor.model import OpenAIAdvisor, SYSTEM_PROMPT, build_prompt, cache_token_counts
+from sts2_advisor.model import (
+    OpenAIAdvisor,
+    SYSTEM_PROMPT,
+    build_prompt,
+    cache_token_counts,
+    clear_codex_cache,
+    model_context_payload,
+)
 from sts2_advisor.normalize import build_decision_context
 
 
@@ -22,6 +29,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"
 
 
 class RemoteModelTests(unittest.TestCase):
+    def setUp(self) -> None:
+        clear_codex_cache()
     def test_environment_flag(self) -> None:
         with patch.dict(os.environ, {"FEATURE": "true"}, clear=True):
             self.assertTrue(environment_flag("FEATURE", False))
@@ -117,9 +126,9 @@ class RemoteModelTests(unittest.TestCase):
 
         deck = payload["stable"]["deck"]
         codex_keys = {entry["k"] for entry in deck}
-        self.assertIn("STRIKE_IRONCLAD", codex_keys)
-        self.assertEqual([entry["k"] for entry in deck], sorted(codex_keys))
-        strike = next(entry for entry in deck if entry["k"] == "STRIKE_IRONCLAD")
+        # 图鉴键为卡牌名（牌堆 API 没有 id，名称是两侧唯一的共同标识）。
+        self.assertEqual(codex_keys, {"打击", "痛击", "防御", "灼热攻击"})
+        strike = next(entry for entry in deck if entry["k"] == "打击")
         self.assertEqual(strike["description"], "造成6点伤害。")
 
         hand = payload["player"]["hand"]
@@ -131,10 +140,54 @@ class RemoteModelTests(unittest.TestCase):
         draw_pile = payload["player"]["draw_pile"]
         self.assertTrue(all(isinstance(value, int) for value in draw_pile.values()))
         self.assertTrue(set(draw_pile) <= codex_keys)
-        # 牌堆卡没有 id 字段，应通过名称统一到手牌卡的 id 键，避免图鉴分裂。
-        self.assertEqual(draw_pile, {"DEFEND_IRONCLAD": 2, "灼热攻击": 1})
-        self.assertNotIn("防御", codex_keys)
-        self.assertIn("灼热攻击", codex_keys)
+        self.assertEqual(draw_pile, {"防御": 2, "灼热攻击": 1})
+
+    def test_codex_prefix_survives_cards_moving_between_hand_and_piles(self) -> None:
+        raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        moved = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        card = moved["player"]["hand"].pop(0)
+        card.pop("index", None)
+        moved["player"]["discard_pile"].append(card)
+        moved["player"]["hp"] = moved["player"]["hp"] - 3
+
+        first = build_decision_context(raw)
+        second = build_decision_context(moved)
+        assert first is not None and second is not None
+        payload_first = model_context_payload(first)
+        payload_second = model_context_payload(second)
+
+        # 打出的牌从手牌进入弃牌堆：图鉴与整个静态前缀必须逐字节不变，
+        # 分歧点只允许出现在 player 动态区（hp 变化）之后。
+        self.assertEqual(payload_first["stable"], payload_second["stable"])
+        text_first = json.dumps(payload_first, ensure_ascii=False, separators=(",", ":"))
+        text_second = json.dumps(payload_second, ensure_ascii=False, separators=(",", ":"))
+        shared = next(i for i, (a, b) in enumerate(zip(text_first, text_second)) if a != b)
+        self.assertGreater(shared, text_first.index('"player"'), text_first[shared - 40 : shared + 40])
+
+    def test_codex_freezes_entries_and_appends_new_cards_at_the_tail(self) -> None:
+        raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        first = build_decision_context(raw)
+        assert first is not None
+        deck_before = model_context_payload(first)["stable"]["deck"]
+
+        # 后续回合：已有卡从手牌进弃牌堆（字段来源变化），新卡生成进手牌。
+        later = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        card = later["player"]["hand"].pop(0)
+        card.pop("index", None)
+        later["player"]["discard_pile"].append(card)
+        later["player"]["hand"].append(
+            {"id": "GENERATED", "name": "新生卡", "cost": "0", "type": "Skill",
+             "description": "战中新卡。", "can_play": True}
+        )
+        second = build_decision_context(later)
+        assert second is not None
+        deck_after = model_context_payload(second)["stable"]["deck"]
+
+        self.assertEqual([entry["k"] for entry in deck_after][: len(deck_before)],
+                         [entry["k"] for entry in deck_before])
+        self.assertEqual(deck_after[-1]["k"], "新生卡")
+        # 首见即冻结：进堆后不再因牌堆条目缺 type 而改写已有条目。
+        self.assertIn("type", next(entry for entry in deck_after if entry["k"] == "打击"))
 
     def test_system_prompt_keeps_json_contract_without_redundant_formatting_rules(self) -> None:
         self.assertIn("返回 JSON 对象", SYSTEM_PROMPT)

@@ -55,6 +55,43 @@ class NormalizeTests(unittest.TestCase):
         self.assertNotIn("card:not-real", validated.alternative_ids)
         self.assertTrue(any("非法备选" in warning for warning in validated.warnings))
 
+    def test_compact_map_encodes_nodes_as_arrays(self) -> None:
+        raw = {
+            "state_type": "map",
+            "run": {"act": 1, "floor": 6},
+            "player": {},
+            "map": {
+                "current_position": {"col": 2, "row": 5, "type": "Monster"},
+                "visited": [
+                    {"col": 2, "row": 4, "type": "Unknown"},
+                    {"col": 2, "row": 5, "type": "Monster"},
+                ],
+                "next_options": [
+                    {"index": 0, "type": "Shop", "col": 1, "row": 6},
+                    {"index": 1, "type": "Monster", "col": 3, "row": 6},
+                ],
+                "nodes": [
+                    {"col": 1, "row": 6, "type": "Shop", "children": [[1, 7]]},
+                    {"col": 3, "row": 6, "type": "Monster", "children": [[3, 7], [2, 7]]},
+                ],
+                "boss": {"col": 3, "row": 16, "id": "X_BOSS", "name": "某Boss"},
+            },
+        }
+        context = build_decision_context(raw)
+        assert context is not None
+        self.assertEqual(context.decision_type, "map")
+        self.assertEqual(context.situation["map"]["nodes"], [
+            [1, 6, "Shop", [[1, 7]]],
+            [3, 6, "Monster", [[3, 7], [2, 7]]],
+        ])
+        self.assertEqual(context.situation["map"]["visited_count"], 2)
+        self.assertNotIn("visited", context.situation["map"])
+        self.assertEqual(context.situation["map"]["next_options"][0]["type"], "Shop")
+        self.assertEqual(
+            [candidate.candidate_id for candidate in context.candidates],
+            ["map:0", "map:1"],
+        )
+
     def test_rule_backend_confirms_completed_selection(self) -> None:
         context = build_decision_context(
             {

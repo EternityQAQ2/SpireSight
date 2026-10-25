@@ -51,21 +51,37 @@ class SqliteRetrievalTests(unittest.TestCase):
     def test_retrieves_matching_ids_and_interactions_into_llm_prompt(self):
         evidence = SqliteFactsRetriever(self.db).retrieve(self.context, 20)
         by_id = {item.evidence_id: item for item in evidence}
-        self.assertIn("sqlite:cards:strike_ironclad", by_id)
         self.assertIn("sqlite:relics:burning_blood", by_id)
         self.assertIn("sqlite:interactions:1", by_id)
+        # 战斗中手牌卡牌事实由牌组图鉴提供，检索不再重复查询。
+        self.assertNotIn("sqlite:cards:strike_ironclad", by_id)
         self.assertNotIn("sqlite:cards:strike_silent", by_id)
         self.assertNotIn("sqlite:cards:unrelated", by_id)
         self.assertNotIn("sqlite:cards:strike_ironclad_upgrade", by_id)
         prompt = build_prompt(self.context, evidence)
         self.assertIn("燃烧之血在战斗结束时结算。", prompt)
         self.assertIn("sqlite:interactions:1", prompt)
+        # 手牌效果仍进入提示词——由图鉴提供。
         self.assertIn("造成6点伤害。", prompt)
 
+    def test_combat_skips_hand_card_facts_but_keeps_relic_facts(self):
+        evidence = SqliteFactsRetriever(self.db).retrieve(self.context, 20)
+        ids = {item.evidence_id for item in evidence}
+        self.assertIn("sqlite:relics:burning_blood", ids)
+        self.assertFalse(any(evidence_id.startswith("sqlite:cards:") for evidence_id in ids))
+
     def test_upgraded_card_uses_upgraded_facts(self):
-        self.raw["player"]["hand"][0]["is_upgraded"] = True
-        self.raw["player"]["hand"][0]["name"] = "Strike"
-        context = build_decision_context(self.raw)
+        raw = {
+            "state_type": "card_reward",
+            "run": {"act": 1, "floor": 4},
+            "player": {},
+            "card_reward": {
+                "cards": [{"index": 0, "name": "打击", "is_upgraded": True}],
+                "can_skip": True,
+            },
+        }
+        context = build_decision_context(raw)
+        assert context is not None
         evidence = SqliteFactsRetriever(self.db).retrieve(context, 20)
         ids = {item.evidence_id for item in evidence}
         self.assertIn("sqlite:cards:strike_ironclad_upgrade", ids)

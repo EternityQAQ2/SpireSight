@@ -126,17 +126,46 @@ def compact_pile(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def card_identity(card: dict[str, Any]) -> tuple[str, bool]:
-    """Aggregate by card identity; name fallback covers pile entries without id."""
-    return (str(card.get("id") or card.get("name") or "?"), bool(card.get("is_upgraded")))
+    """按名称聚合：牌堆卡没有 id 字段，名称是手牌与牌堆共同的稳定标识。"""
+    return (str(card.get("name") or card.get("id") or "?"), bool(card.get("is_upgraded")))
 
 
 def compact_situation(raw: dict[str, Any]) -> dict[str, Any]:
     state_type = str(raw.get("state_type"))
     if state_type in {"monster", "elite", "boss", "hand_select"}:
         return {"battle": raw.get("battle", {}), "hand_select": raw.get("hand_select")}
+    if state_type == "map":
+        return {"map": compact_map(raw.get("map", {}))}
     key = "fake_merchant" if state_type == "fake_merchant" else state_type
     value = raw.get(key, {})
     return {key: value}
+
+
+def compact_map(map_data: dict[str, Any]) -> dict[str, Any]:
+    """压缩地图状态：全图节点改为 [col,row,type,children] 数组编码（去掉键名），
+    已访问节点只保留数量。路线规划信息完整保留，体积约为原始的六成。"""
+    if not isinstance(map_data, dict):
+        return map_data
+    slim: dict[str, Any] = {}
+    for field in ("current_position", "next_options", "boss", "bosses"):
+        if map_data.get(field) is not None:
+            slim[field] = map_data[field]
+    nodes = map_data.get("nodes")
+    if isinstance(nodes, list):
+        slim["nodes"] = [
+            [
+                node.get("col"),
+                node.get("row"),
+                node.get("type"),
+                node.get("children", []),
+            ]
+            for node in nodes
+            if isinstance(node, dict) and "col" in node and "row" in node
+        ]
+    visited = map_data.get("visited")
+    if isinstance(visited, list):
+        slim["visited_count"] = len(visited)
+    return slim
 
 
 def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
