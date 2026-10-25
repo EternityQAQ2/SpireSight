@@ -21,14 +21,85 @@ EMBEDDING_MODEL = os.environ.get("STS2_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5
 
 
 def chroma_embedding_function():
-    """ingest 与查询共用的 sentence-transformers 嵌入函数（懒加载，rag 可选依赖）。"""
+    """ingest 与查询共用的 sentence-transformers 嵌入函数（懒加载，rag 可选依赖）。
+
+    transformers 5.x 在线检查 Hub 时对部分仓库会误入 AutoProcessor 加载路径而报
+    "Unrecognized processing class"；模型已在本地缓存时直接解析快照路径加载，
+    完全不碰网络，仅缓存缺失时回退在线解析。
+    """
     from chromadb.utils import embedding_functions
 
-    return embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name=cached_model_path(EMBEDDING_MODEL)
+    )
+
+
+def cached_model_path(model_name: str) -> str:
+    """Return the local snapshot directory when the model is cached, else the name."""
+    try:
+        from huggingface_hub import snapshot_download
+
+        return str(snapshot_download(repo_id=model_name, local_files_only=True))
+    except Exception:
+        return model_name
 
 
 class Retriever(Protocol):
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]: ...
+
+
+def parse_evidence_lines(path: Path, kind: str) -> list[Evidence]:
+    """逐行解析 JSONL 知识记录；文件缺失视为空，坏行报错并标出行号。"""
+    records: list[Evidence] = []
+    if not path.exists():
+        return records
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+            records.append(
+                Evidence(
+                    evidence_id=str(record["evidence_id"]),
+                    text=str(record["text"]),
+                    source_title=str(record.get("source_title", record["evidence_id"])),
+                    source_url=str(record.get("source_url", "")),
+                    metadata=dict(record.get("metadata") or {}),
+                )
+            )
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{kind} {path} 第 {line_number} 行无效: {exc}") from exc
+    return records
+
+
+def load_seeds(path: Path) -> list[Evidence]:
+    """读取内置基线规则。seeds.jsonl 只由人工维护，ingest --rebuild 不得触碰。"""
+    return parse_evidence_lines(path, "种子规则")
+
+
+class SeedInjectingRetriever:
+    """把内置基线规则前置注入检索结果，不占 top_k 名额。
+
+    语料检索是尽力而为的相似度排名：top-k 窗口可能被无资格块占满，
+    语料文件也可能被 rebuild 清空重建，基线规则一旦缺席一次就可能输掉
+    整局，因此必须由检索工厂统一保证注入，不依赖语料库状态。
+    mode=none 是显式关闭知识库，不包裹、不注入。
+    """
+
+    def __init__(self, inner: Retriever, seeds: list[Evidence]) -> None:
+        self.inner = inner
+        self.seeds = seeds
+
+    def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
+        evidence = self.inner.retrieve(context, top_k)
+        present = {item.evidence_id for item in evidence}
+        matched = [
+            seed for seed in self.seeds
+            if seed.evidence_id not in present and metadata_matches(seed.metadata, context)
+        ]
+        if matched:
+            record_event("retrieval.seeds", evidence_ids=[item.evidence_id for item in matched])
+        return matched + evidence
 
 
 class NullRetriever:
@@ -41,25 +112,7 @@ class JsonKnowledgeRetriever:
 
     def __init__(self, path: Path) -> None:
         self.path = path
-        self.records: list[Evidence] = []
-        if not path.exists():
-            return
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-                self.records.append(
-                    Evidence(
-                        evidence_id=str(record["evidence_id"]),
-                        text=str(record["text"]),
-                        source_title=str(record.get("source_title", record["evidence_id"])),
-                        source_url=str(record.get("source_url", "")),
-                        metadata=dict(record.get("metadata") or {}),
-                    )
-                )
-            except (KeyError, TypeError, json.JSONDecodeError) as exc:
-                raise ValueError(f"知识库 {path} 第 {line_number} 行无效: {exc}") from exc
+        self.records: list[Evidence] = parse_evidence_lines(path, "知识库")
 
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
         query_terms = tokenize(json.dumps(context.to_dict(), ensure_ascii=False))
@@ -222,13 +275,18 @@ class SqliteFactsRetriever:
 
 def create_retriever(
     mode: str, chroma_path: Path, fallback_path: Path, *, facts_path: Path | None = None,
+    seeds_path: Path | None = None,
 ) -> Retriever:
     if mode == "none":
         return NullRetriever()
+    seeds = load_seeds(
+        seeds_path if seeds_path is not None
+        else Path(__file__).resolve().parents[2] / "data/seeds.jsonl"
+    )
     if mode == "json":
-        return JsonKnowledgeRetriever(fallback_path)
+        return SeedInjectingRetriever(JsonKnowledgeRetriever(fallback_path), seeds)
     if mode == "chroma":
-        return ChromaRetriever(chroma_path)
+        return SeedInjectingRetriever(ChromaRetriever(chroma_path), seeds)
     if mode == "auto":
         retriever: Retriever | None = None
         try:
@@ -242,7 +300,8 @@ def create_retriever(
         path = facts_path if facts_path is not None else (
             Path(__file__).resolve().parents[2] / "data/sts2_facts.sqlite3"
         )
-        return SqliteFactsRetriever(path, retriever) if path.is_file() else retriever
+        combined = SqliteFactsRetriever(path, retriever) if path.is_file() else retriever
+        return SeedInjectingRetriever(combined, seeds)
     raise ValueError(f"未知检索模式: {mode}")
 
 

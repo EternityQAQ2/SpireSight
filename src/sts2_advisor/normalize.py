@@ -179,7 +179,12 @@ def build_candidates(raw: dict[str, Any]) -> list[Candidate]:
         # to the confirm action so the model cannot toggle between cards forever.
         # Exact multi-card prompts keep can_confirm false until enough cards are
         # selected; optional "up to N" prompts may confirm early, which is legal.
-        if data.get("selected_cards") and data.get("can_confirm"):
+        # upgrade_select is an exact-one prompt whose selected_cards stays empty
+        # (the selection only shows as a card missing from the cards list), so
+        # can_confirm alone already proves the choice is complete there.
+        if data.get("can_confirm") and (
+            data.get("selected_cards") or data.get("mode") == "upgrade_select"
+        ):
             return [Candidate("hand_select:confirm", "combat_confirm_selection", "确认选择")]
         result = [
             Candidate(f"hand_select:{card['index']}", "combat_select_card", card.get("name", "选择卡牌"), {"card_index": card["index"]})

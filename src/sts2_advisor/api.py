@@ -2,6 +2,7 @@ from __future__ import annotations
 '''
 只读访问 STS2MCP /singleplayer
 '''
+import hashlib
 import json
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -23,6 +24,7 @@ class Sts2RestClient:
     def __init__(self, base_url: str = "http://localhost:15526", timeout: float = 5.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self._last_response_digest: dict[str, str] = {}
 
     def get_singleplayer_state(self) -> dict[str, Any]:
         return self._get_json("/api/v1/singleplayer")
@@ -41,8 +43,15 @@ class Sts2RestClient:
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read()
-                record_event("environment.response", request_id=request_id,
-                             http_status=response.status, raw_body=raw.decode("utf-8", errors="replace"))
+                status = response.status
+                # 轮询期间同一端点常返回逐字节相同的响应；重复响应不再落库，
+                # 变化后的首条仍完整保留（environment.observation 侧同理去重）。
+                digest = hashlib.sha256(raw).hexdigest()
+                previous = self._last_response_digest.get(path)
+                self._last_response_digest[path] = digest
+                if digest != previous:
+                    record_event("environment.response", request_id=request_id,
+                                 http_status=status, raw_body=raw.decode("utf-8", errors="replace"))
         except HTTPError as exc:
             raw = exc.read()
             record_event("environment.response", request_id=request_id, http_status=exc.code,

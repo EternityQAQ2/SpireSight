@@ -216,6 +216,15 @@ def main(argv: list[str] | None = None) -> int:
         raise
     finally:
         recorder.close(session_status)
+        if not args.no_record:
+            # 会话轨迹已落库，退出时顺手刷新战绩报表；失败不阻断退出。
+            try:
+                from .runstats import refresh
+
+                count = refresh()
+                print(f"战绩统计已更新（{count} 局）：docs/run-stats.md")
+            except Exception as exc:  # noqa: BLE001
+                print(f"警告：战绩统计刷新失败：{exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

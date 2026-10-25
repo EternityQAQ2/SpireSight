@@ -1,11 +1,57 @@
 {
-  "generated_at": "2026-10-25T10:43:50.452993+00:00",
+  "generated_at": "2026-10-25T14:19:50.470918+00:00",
   "guides_dir": "guides",
   "decision_types": [
     "card_reward",
     "shop"
   ],
+  "decision_types_note": "未显式指定时按类别自动选择（builds/bosses）",
   "entries": [
+    {
+      "path": "guides\\bosses\\第一幕.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "第一幕",
+      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-1-overgrowth-and-underdocks",
+      "license": "spirebuilds.com，未标注"
+    },
+    {
+      "path": "guides\\bosses\\第三幕.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "第三幕",
+      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-3-glory",
+      "license": "spirebuilds.com，未标注"
+    },
+    {
+      "path": "guides\\bosses\\第二幕.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "第二幕",
+      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-2-hive",
+      "license": "spirebuilds.com，未标注"
+    },
+    {
+      "path": "guides\\bosses\\药水与篝火.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "药水与篝火",
+      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#potion-and-campfire-decisions",
+      "license": "spirebuilds.com，未标注"
+    },
+    {
+      "path": "guides\\bosses\\通用备战清单.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "通用备战清单",
+      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide",
+      "license": "spirebuilds.com，未标注"
+    },
     {
       "path": "guides\\builds\\亡灵契约师流派\\奥斯提召唤.md",
       "category": "builds",

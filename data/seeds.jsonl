@@ -1,0 +1,1 @@
+{"evidence_id":"builtin-combat-survival-001","text":"当敌人本回合将造成伤害时，比较预计伤害、现有格挡与生命值。若无法在本回合可靠击杀，优先避免不必要的生命损失；同时考虑战斗结束治疗遗物。","source_title":"项目内置基础战斗原则","source_url":"","metadata":{"character":"all","decision_types":["combat_next_action"],"license":"project","review_status":"seed"}}

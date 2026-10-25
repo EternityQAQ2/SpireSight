@@ -28,8 +28,14 @@ from sts2_advisor.ingest import main as ingest_main  # noqa: E402
 LICENSE_BY_DOMAIN = (
     ("slaythespire2.net", "slaythespire2.net，未标注"),
     ("huijiwiki.com", "CC BY-NC-SA 灰机wiki"),
+    ("spirebuilds.com", "spirebuilds.com，未标注"),
 )
 DEFAULT_DECISION_TYPES = ("card_reward", "shop")
+# 类别决定默认投放的决策界面；bosses 备战影响路线、篝火、商店与选牌。
+DECISION_TYPES_BY_CATEGORY = {
+    "builds": ("card_reward", "shop"),
+    "bosses": ("map", "rest_site", "shop", "card_reward"),
+}
 
 
 def source_url(text: str) -> str:
@@ -103,8 +109,12 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = 0
     for item in plans:
+        effective_types = (
+            args.decision_type
+            or list(DECISION_TYPES_BY_CATEGORY.get(item["category"], DEFAULT_DECISION_TYPES))
+        )
         print(f"[入库] {item['path'].relative_to(args.guides_dir)}")
-        print(f"        从属: 类别={item['category']} 组={item['group']} 角色={item['character']}")
+        print(f"        从属: 类别={item['category']} 组={item['group']} 角色={item['character']} 决策={','.join(effective_types)}")
         print(f"        来源: {item['url'] or '(未找到链接)'} | 许可: {item['license']}")
         if not item["url"]:
             print("        [警告] 正文没有来源链接，溯源信息不完整")
@@ -115,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             "--title", item["title"],
             "--url", item["url"],
             "--character", item["character"],
-            *[flag for decision_type in decision_types for flag in ("--decision-type", decision_type)],
+            *[flag for decision_type in effective_types for flag in ("--decision-type", decision_type)],
             "--chroma-path", str(args.chroma_path),
             "--license", item["license"],
         ]
@@ -130,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "guides_dir": str(args.guides_dir),
                 "decision_types": decision_types,
+                "decision_types_note": "未显式指定时按类别自动选择（builds/bosses）",
                 "entries": [
                     {key: (str(value) if isinstance(value, Path) else value) for key, value in item.items()}
                     for item in plans

@@ -82,6 +82,9 @@ class SqliteRetrievalTests(unittest.TestCase):
         self.knowledge.write_text(json.dumps({
             "evidence_id": "survival-guide", "text": "优先避免生命损失。", "source_title": "战斗攻略",
         }, ensure_ascii=False) + "\n", encoding="utf-8")
+        # 本文件只验证 sqlite/json 组合逻辑，空种子文件隔离 seed 注入（另见 test_seed_injection）
+        self.seeds = self.root / "seeds.jsonl"
+        self.seeds.write_text("", encoding="utf-8")
 
     def test_retrieves_matching_ids_and_interactions_into_llm_prompt(self):
         evidence = SqliteFactsRetriever(self.db).retrieve(self.context, 20)
@@ -133,7 +136,8 @@ class SqliteRetrievalTests(unittest.TestCase):
 
     def test_auto_combines_sqlite_facts_with_existing_guides_and_respects_top_k(self):
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
-            retriever = create_retriever("auto", self.root / "chroma", self.knowledge, facts_path=self.db)
+            retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
+                                         facts_path=self.db, seeds_path=self.seeds)
         evidence = retriever.retrieve(self.context, 3)
         self.assertEqual(len(evidence), 3)
         self.assertIn("survival-guide", {item.evidence_id for item in evidence})
@@ -143,14 +147,16 @@ class SqliteRetrievalTests(unittest.TestCase):
     def test_missing_database_falls_back_without_creating_it(self):
         missing = self.root / "missing.sqlite3"
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
-            retriever = create_retriever("auto", self.root / "chroma", self.knowledge, facts_path=missing)
+            retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
+                                         facts_path=missing, seeds_path=self.seeds)
         self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], ["survival-guide"])
         self.assertFalse(missing.exists())
 
     def test_explicit_json_and_none_modes_keep_existing_behavior(self):
         for mode, expected in [("none", []), ("json", ["survival-guide"])]:
             with self.subTest(mode=mode):
-                retriever = create_retriever(mode, self.root / "chroma", self.knowledge, facts_path=self.db)
+                retriever = create_retriever(mode, self.root / "chroma", self.knowledge,
+                                             facts_path=self.db, seeds_path=self.seeds)
                 self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], expected)
 
 

@@ -16,6 +16,7 @@ from unittest.mock import patch
 from sts2_advisor.api import Sts2ApiError
 from sts2_advisor.domain import Advice
 from sts2_advisor.model import OpenAIAdvisor, RuleAdvisor
+from sts2_advisor.record import trace_scope
 from sts2_advisor.recording import SessionRecorder
 from sts2_advisor.retrieval import JsonKnowledgeRetriever, NullRetriever
 from sts2_advisor.service import AdvisorService
@@ -301,6 +302,75 @@ class TrajectoryTests(unittest.TestCase):
                 self.assertEqual(legacy["step_id"], decision["step_id"])
                 self.assertEqual(legacy["session_id"], decision["session_id"])
                 recorder.close()
+
+
+class ObservationDedupTests(unittest.TestCase):
+    def test_identical_consecutive_states_recorded_once(self):
+        state = {"state_type": "map", "run": {"floor": 3},
+                 "player": {"character": "铁甲战士"},
+                 "map": {"next_options": [{"index": 0, "type": "Monster", "col": 2, "row": 3}]}}
+
+        class Client:
+            def get_singleplayer_state(self):
+                return state
+
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = SessionRecorder(Path(directory))
+            service = AdvisorService(Client(), NullRetriever(), RuleAdvisor(), recorder,
+                                     backend_name="test", output=lambda _: None)
+            try:
+                service._read_state()
+                service._read_state()
+                service._read_state()
+                state["run"] = {"floor": 4}
+                service._read_state()
+                service._read_state()
+            finally:
+                recorder.close()
+            observations = [e for e in read_events(directory)
+                            if e["event_type"] == "environment.observation"]
+            self.assertEqual(len(observations), 2)
+            self.assertEqual(observations[0]["payload"]["raw_state"]["run"]["floor"], 3)
+            self.assertEqual(observations[1]["payload"]["raw_state"]["run"]["floor"], 4)
+
+    def test_identical_responses_recorded_once_per_endpoint(self):
+        class FakeResponse:
+            status = 200
+
+            def __init__(self, body):
+                self._body = body
+
+            def read(self):
+                return self._body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        from sts2_advisor.api import Sts2RestClient
+
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = SessionRecorder(Path(directory))
+            try:
+                bodies = [b'{"state_type": "map"}', b'{"state_type": "map"}', b'{"state_type": "event"}']
+                client = Sts2RestClient("http://example.test")
+                with patch("sts2_advisor.api.urlopen",
+                           side_effect=[FakeResponse(body) for body in bodies]),                         trace_scope(recorder.trajectory):
+                    client._get_json("/api/v1/singleplayer")
+                    client._get_json("/api/v1/singleplayer")
+                    client._get_json("/api/v1/singleplayer")
+            finally:
+                recorder.close()
+            responses = [e for e in read_events(directory)
+                         if e["event_type"] == "environment.response"]
+            requests = [e for e in read_events(directory)
+                        if e["event_type"] == "environment.request"]
+            self.assertEqual(len(responses), 2)
+            self.assertEqual(len(requests), 3)
+            self.assertEqual(responses[0]["payload"]["raw_body"], '{"state_type": "map"}')
+            self.assertEqual(responses[1]["payload"]["raw_body"], '{"state_type": "event"}')
 
 
 if __name__ == "__main__":
