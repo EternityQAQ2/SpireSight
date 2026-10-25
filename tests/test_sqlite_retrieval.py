@@ -8,10 +8,45 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
+from sts2_advisor.domain import DecisionContext
 from sts2_advisor.model import build_prompt
 from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.retrieval import SqliteFactsRetriever, create_retriever
+from sts2_advisor.retrieval import SqliteFactsRetriever, create_retriever, metadata_matches
 from tools.build_wiki_db import SCHEMA_SQL
+
+
+def make_context(decision_type: str, character: str = "铁甲战士") -> DecisionContext:
+    return DecisionContext(
+        "1.0", "test", decision_type, decision_type, {},
+        {"character": character}, {}, [],
+    )
+
+
+class MetadataFilterTests(unittest.TestCase):
+    def test_chroma_multi_type_metadata_only_matches_listed_types(self) -> None:
+        # ingest 多类型时写入 decision_type="all"，过滤不得把它当通配符
+        metadata = {"decision_type": "all", "decision_types": "card_reward,shop",
+                    "character": "铁甲战士"}
+        self.assertTrue(metadata_matches(metadata, make_context("card_reward")))
+        self.assertTrue(metadata_matches(metadata, make_context("shop")))
+        self.assertFalse(metadata_matches(metadata, make_context("map")))
+        self.assertFalse(metadata_matches(metadata, make_context("combat_next_action")))
+
+    def test_chroma_character_filter(self) -> None:
+        metadata = {"decision_types": "card_reward", "character": "故障机器人"}
+        self.assertTrue(metadata_matches(metadata, make_context("card_reward", "故障机器人")))
+        self.assertFalse(metadata_matches(metadata, make_context("card_reward", "铁甲战士")))
+        self.assertFalse(
+            metadata_matches(metadata, make_context("map", "故障机器人")))
+
+    def test_jsonl_list_metadata_still_matches(self) -> None:
+        metadata = {"decision_types": ["card_reward", "shop"], "character": "all"}
+        self.assertTrue(metadata_matches(metadata, make_context("shop")))
+        self.assertFalse(metadata_matches(metadata, make_context("event")))
+
+    def test_empty_or_all_metadata_matches_everything(self) -> None:
+        self.assertTrue(metadata_matches({}, make_context("map")))
+        self.assertTrue(metadata_matches({"decision_types": "all"}, make_context("event")))
 
 
 class SqliteRetrievalTests(unittest.TestCase):
@@ -47,6 +82,9 @@ class SqliteRetrievalTests(unittest.TestCase):
         self.knowledge.write_text(json.dumps({
             "evidence_id": "survival-guide", "text": "优先避免生命损失。", "source_title": "战斗攻略",
         }, ensure_ascii=False) + "\n", encoding="utf-8")
+        # 本文件只验证 sqlite/json 组合逻辑，空种子文件隔离 seed 注入（另见 test_seed_injection）
+        self.seeds = self.root / "seeds.jsonl"
+        self.seeds.write_text("", encoding="utf-8")
 
     def test_retrieves_matching_ids_and_interactions_into_llm_prompt(self):
         evidence = SqliteFactsRetriever(self.db).retrieve(self.context, 20)
@@ -98,7 +136,8 @@ class SqliteRetrievalTests(unittest.TestCase):
 
     def test_auto_combines_sqlite_facts_with_existing_guides_and_respects_top_k(self):
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
-            retriever = create_retriever("auto", self.root / "chroma", self.knowledge, facts_path=self.db)
+            retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
+                                         facts_path=self.db, seeds_path=self.seeds)
         evidence = retriever.retrieve(self.context, 3)
         self.assertEqual(len(evidence), 3)
         self.assertIn("survival-guide", {item.evidence_id for item in evidence})
@@ -108,14 +147,16 @@ class SqliteRetrievalTests(unittest.TestCase):
     def test_missing_database_falls_back_without_creating_it(self):
         missing = self.root / "missing.sqlite3"
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
-            retriever = create_retriever("auto", self.root / "chroma", self.knowledge, facts_path=missing)
+            retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
+                                         facts_path=missing, seeds_path=self.seeds)
         self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], ["survival-guide"])
         self.assertFalse(missing.exists())
 
     def test_explicit_json_and_none_modes_keep_existing_behavior(self):
         for mode, expected in [("none", []), ("json", ["survival-guide"])]:
             with self.subTest(mode=mode):
-                retriever = create_retriever(mode, self.root / "chroma", self.knowledge, facts_path=self.db)
+                retriever = create_retriever(mode, self.root / "chroma", self.knowledge,
+                                             facts_path=self.db, seeds_path=self.seeds)
                 self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], expected)
 
 

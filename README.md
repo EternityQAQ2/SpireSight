@@ -181,7 +181,7 @@ $env:PYTHONPATH="src"
 .venv\Scripts\python.exe test_api.py
 ```
 
-单元测试不需要游戏；`test_api.py` 需要真实 STS2MCP。
+单元测试不需要游戏；`tools/test_api.py` 需要真实 STS2MCP。
 
 ## 边界
 

@@ -70,8 +70,11 @@ def main(argv: list[str] | None = None) -> int:
             import chromadb
         except ImportError as exc:
             raise SystemExit("未安装 chromadb；请先安装 rag 可选依赖") from exc
+        from .retrieval import EMBEDDING_MODEL, chroma_embedding_function
+
         collection = chromadb.PersistentClient(path=str(args.chroma_path)).get_or_create_collection(
-            name=args.collection
+            name=args.collection,
+            embedding_function=chroma_embedding_function(),
         )
         collection.upsert(
             ids=[record["evidence_id"] for record in records],
@@ -93,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
                 for record in records
             ],
         )
-        print(f"已写入 {len(records)} 个 Chroma 知识块：{args.chroma_path}/{args.collection}")
+        print(f"已写入 {len(records)} 个 Chroma 知识块：{args.chroma_path}/{args.collection}（嵌入模型 {EMBEDDING_MODEL}）")
     return 0
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import sys
 import time
 from contextlib import nullcontext
@@ -52,6 +54,7 @@ class AdvisorService:
         self._previous_step_id: str | None = None
         self._plan_origin_step_id: str | None = None
         self._current_step_id: str | None = None
+        self._last_observation_digest: str | None = None
 
     def _read_state(self) -> dict:
         with trace_scope(self.trajectory):
@@ -60,9 +63,32 @@ class AdvisorService:
             except Sts2ApiError as exc:
                 record_event("environment.error", message=str(exc), after_step_id=self._previous_step_id)
                 raise
-            record_event("environment.observation", raw_state=raw_state,
-                         after_step_id=self._previous_step_id)
+            # 轮询间隔内游戏状态经常完全不变（实测约六成观察是逐字节重复），
+            # 重复样本对训练与统计都是噪音：只记录内容变化后的首条。
+            try:
+                digest = hashlib.sha256(
+                    json.dumps(raw_state, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+            except (TypeError, ValueError):
+                digest = None
+            if digest is None or digest != self._last_observation_digest:
+                self._last_observation_digest = digest
+                record_event("environment.observation", raw_state=raw_state,
+                             after_step_id=self._previous_step_id)
+                if raw_state.get("state_type") == "game_over":
+                    # 局终立即刷新战绩报表（去重保证每个 game_over 只触发一次），
+                    # 不必等 advisor 退出；退出钩子继续兜底处理中途停止的局。
+                    self._refresh_run_stats()
             return raw_state
+
+    def _refresh_run_stats(self) -> None:
+        try:
+            from .runstats import refresh
+
+            count = refresh()
+            self.output(f"检测到对局结束，战绩统计已更新（{count} 局）：docs/run-stats.md")
+        except Exception as exc:  # noqa: BLE001
+            self.output(f"警告：战绩统计刷新失败：{exc}")
 
     def run_once(self, *, force: bool = False) -> bool:
         raw_state = self._read_state()

@@ -311,6 +311,51 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["hand_select:confirm"])
         self.assertEqual(context.candidates[0].action_type, "combat_confirm_selection")
 
+    def test_upgrade_selection_with_empty_reported_selected_cards_still_confirms(self) -> None:
+        # 升级界面选中一张后 selected_cards 仍为空（选中只表现为卡从列表消失），
+        # can_confirm=True 已证明选择完成，必须收敛为仅确认，否则模型会在卡牌间无限切换。
+        context = build_decision_context(
+            {
+                "state_type": "hand_select",
+                "run": {"act": 1, "floor": 8},
+                "player": {},
+                "hand_select": {
+                    "mode": "upgrade_select",
+                    "cards": [
+                        {"index": 0, "name": "防御"},
+                        {"index": 1, "name": "防御"},
+                    ],
+                    "selected_cards": [],
+                    "can_confirm": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["hand_select:confirm"])
+
+    def test_optional_multi_select_keeps_card_candidates_when_confirm_early(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "hand_select",
+                "run": {"act": 1, "floor": 3},
+                "player": {},
+                "hand_select": {
+                    "mode": "simple_select",
+                    "cards": [
+                        {"index": 0, "name": "打击"},
+                        {"index": 1, "name": "防御"},
+                    ],
+                    "selected_cards": [],
+                    "can_confirm": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual(
+            [candidate.candidate_id for candidate in context.candidates],
+            ["hand_select:0", "hand_select:1", "hand_select:confirm"],
+        )
+
     def test_ready_exhaust_selection_only_exposes_confirm(self) -> None:
         context = build_decision_context(
             {

@@ -39,7 +39,7 @@ chflags nohidden .venv/lib/python*/site-packages/*.pth
 .venv/bin/python main.py --watch --backend rule --rag json
 ```
 
-`test_api.py` 会 GET 检查多个只读端点；建议器运行时只 GET `/api/v1/singleplayer`。没有游戏或模组时，连接失败是预期结果，不能算作真实游戏联调通过。先用规则后端确认链路，再使用模型后端；规则建议不代表高水平策略。
+`../tools/test_api.py` 会 GET 检查多个只读端点；建议器运行时只 GET `/api/v1/singleplayer`。没有游戏或模组时，连接失败是预期结果，不能算作真实游戏联调通过。先用规则后端确认链路，再使用模型后端；规则建议不代表高水平策略。
 
 Ctrl+C 停止监听。相同局面稳定读取后只输出一次建议。默认记录至 `recordings/`；用 `--no-record` 关闭。
 
