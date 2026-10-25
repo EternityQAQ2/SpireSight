@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-25T14:19:50.470918+00:00",
+  "generated_at": "2026-10-25T16:10:21.978713+00:00",
   "guides_dir": "guides",
   "decision_types": [
     "card_reward",
@@ -7,6 +7,15 @@
   ],
   "decision_types_note": "未显式指定时按类别自动选择（builds/bosses）",
   "entries": [
+    {
+      "path": "guides\\bosses\\备战检查单.md",
+      "category": "bosses",
+      "group": "bosses",
+      "character": "all",
+      "title": "备战检查单",
+      "url": "https://www.spirebuilds.com/guides/boss-preparation-checklist",
+      "license": "spirebuilds.com，未标注"
+    },
     {
       "path": "guides\\bosses\\第一幕.md",
       "category": "bosses",
