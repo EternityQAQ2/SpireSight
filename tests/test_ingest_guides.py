@@ -30,6 +30,12 @@ class DecisionTypeRoutingTest(unittest.TestCase):
             ["card_reward", "shop"],
         )
 
+    def test_mechanics_category_routes_to_combat(self) -> None:
+        self.assertEqual(
+            ingest_guides.resolve_decision_types("mechanics/战斗基础.md", "mechanics", []),
+            ["combat_next_action"],
+        )
+
     def test_unknown_category_falls_back_to_default(self) -> None:
         self.assertEqual(
             ingest_guides.resolve_decision_types("events/某事件.md", "events", []),

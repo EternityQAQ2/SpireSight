@@ -46,6 +46,8 @@ DEFAULT_DECISION_TYPES = ("card_reward", "shop")
 DECISION_TYPES_BY_CATEGORY = {
     "builds": ("card_reward", "shop"),
     "bosses": ("combat_next_action",),
+    # mechanics：通用规则（格挡清零、能量、多段攻击），每次战斗都要参考。
+    "mechanics": ("combat_next_action",),
 }
 # 单文件覆盖：key 是相对 guides/ 的 posix 路径。
 # 例：想让某份 Boss 备战攻略重新进入地图与篝火决策：

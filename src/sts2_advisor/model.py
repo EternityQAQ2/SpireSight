@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Protocol
 
+from .combat import candidate_metrics, combat_summary, incoming_damage
 from .domain import Advice, DecisionContext, Evidence
 from .logging_config import get_logger
 from .record import record_event, recorded_call, recording_enabled
@@ -320,6 +321,10 @@ stable.deck 是卡牌图鉴：手牌与牌堆只给出图鉴键 k（末尾 + 表
 3. 商店可按余额连续购买；奖励可连续领取确定项，打开选牌时停止。
 4. 地图、事件、选牌、休息点只规划当前一步。地图 nodes 每项为 [列,行,类型,子节点[[列,行]…]]，visited 已省略为 visited_count。选择类界面（card_select/hand_select）中已选卡不会出现在 candidates；选择已满足要求时直接输出 confirm 候选，candidate_id 与 alternative_ids 都不得引用已选卡。
 5. 只依据输入；证据不足则降低 confidence，不虚构效果。reason 不超过 80 个汉字，不输出思维过程。
+6. 战斗输入的 combat 是已算好的事实：incoming_damage 为本回合全部攻击的总伤害（多段已按段数累乘），unblocked_damage = max(0, incoming_damage - 当前格挡)，hp_after_unblocked 为不额外格挡时的生命。candidates 里的 dmg 是单目标总伤害，hits 是命中段数，self_damage 是荆棘等反伤，block 是获得的格挡。直接使用这些数字，不要再用描述文字重算。
+7. 格挡只在本回合有效，己方回合开始时清零。敌人本回合没有攻击意图时，不要单纯为了格挡而出防御牌；只有它能立刻转化为伤害、用于消耗/弃牌等引擎，或明确保留到下一回合时才值得。
+8. 若某张攻击牌的 self_damage 大于等于当前生命，且它不能在本回合结束战斗，则不得打出。
+9. 计划中所有出牌的费用总和不得超过当前能量；先确定本回合能否击杀或需要多少格挡，再安排输出顺序。生命是有限资源：换血只有在能击杀、能阻止致命攻击或换来明显节奏优势时才值得。
 返回 JSON 对象，必须且只能包含：
 {"decision_id":"输入值","candidate_id":"动作ID","reason":"理由","confidence":0.0,"alternative_ids":[],"evidence_ids":[],"warnings":[],"plan_candidate_ids":["动作ID"]}
 confidence 范围 0 至 1；无值的数组用 []。"""
@@ -363,17 +368,34 @@ def model_context_payload(context: DecisionContext) -> dict:
     dynamic_player["hand"] = [compact_hand_card(card) for card in player.get("hand", [])]
     for pile in ("draw_pile", "discard_pile", "exhaust_pile"):
         dynamic_player[pile] = pile_counts(player.get(pile, []))
-    return {
+    candidates = [
+        {"id": item.candidate_id, "label": item.label} for item in context.candidates
+    ]
+    payload = {
         "stable": stable,
         "run": context.run,
         "state_type": context.state_type,
         "decision_type": context.decision_type,
         "player": dynamic_player,
         "situation": context.situation,
-        "candidates": [
-            {"id": item.candidate_id, "label": item.label} for item in context.candidates
-        ],
+        "candidates": candidates,
     }
+    if context.decision_type == "combat_next_action":
+        # 意图原文是「造成6点伤害3次」这类自然语言，模型容易只取第一段。
+        # 这里把本回合威胁与每张候选的实际伤害/反伤算成结构化数字，
+        # 只做算术，不替模型选目标或排序。
+        summary = combat_summary(context)
+        if summary:
+            payload["combat"] = summary
+            battle = context.situation.get("battle") or {}
+            enemies = [
+                item for item in battle.get("enemies") or [] if isinstance(item, dict)
+            ]
+            cards = {card.get("index"): card for card in player.get("hand", [])}
+            for item, entry in zip(context.candidates, candidates):
+                card = cards.get(item.params.get("card_index"))
+                entry.update(candidate_metrics(item, card, enemies))
+    return payload
 
 
 def card_key(card: dict) -> str:
@@ -514,17 +536,6 @@ def choose_rule_candidate(context: DecisionContext):
         None,
     )
     return non_exit or context.candidates[0]
-
-
-def incoming_damage(situation: dict) -> int:
-    total = 0
-    for enemy in situation.get("battle", {}).get("enemies", []):
-        for intent in enemy.get("intents", []):
-            if intent.get("type") == "Attack":
-                numbers = re.findall(r"\d+", str(intent.get("label", "")))
-                if numbers:
-                    total += int(numbers[0])
-    return total
 
 
 def rule_reason(context: DecisionContext, label: str) -> str:

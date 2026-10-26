@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-26T12:43:42.842602+00:00",
+  "generated_at": "2026-10-26T13:46:40.650604+00:00",
   "guides_dir": "guides",
   "default_decision_types": [
     "card_reward",
@@ -11,6 +11,9 @@
       "shop"
     ],
     "bosses": [
+      "combat_next_action"
+    ],
+    "mechanics": [
       "combat_next_action"
     ]
   },
@@ -565,6 +568,19 @@
       "decision_types": [
         "card_reward",
         "shop"
+      ],
+      "enemies": []
+    },
+    {
+      "path": "mechanics/战斗基础.md",
+      "category": "mechanics",
+      "group": "mechanics",
+      "character": "all",
+      "title": "战斗基础",
+      "url": "https://sts2.huijiwiki.com/wiki/%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
       ],
       "enemies": []
     }

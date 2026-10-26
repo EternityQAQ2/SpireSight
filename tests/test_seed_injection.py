@@ -102,6 +102,7 @@ class SeedInjectionTests(unittest.TestCase):
         default_path = Path(__file__).resolve().parents[1] / "data" / "seeds.jsonl"
         shipped = {seed.evidence_id for seed in load_seeds(default_path)}
         self.assertIn("builtin-combat-survival-001", shipped)
+        self.assertIn("builtin-combat-mechanics-001", shipped)
         self.assertIn("builtin-event-hp-trading-001", shipped)
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("json", self.root / "chroma", self.knowledge,

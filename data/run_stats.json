@@ -906,6 +906,28 @@
       "cache_hit_tokens": 40320,
       "cache_hit_rate": 0.205,
       "outcome": "death"
+    },
+    {
+      "character": "铁甲战士",
+      "started_at": "2026-10-26T12:51:52.095627+00:00",
+      "ended_at": "2026-10-26T13:07:58.892105+00:00",
+      "max_floor": 24,
+      "max_act": 2,
+      "ascension": 0,
+      "final_hp": 0,
+      "max_hp": 85,
+      "game_over_observed": true,
+      "session_ids": [
+        "6518e404-a0db-4c88-b4c4-f091cb6b1403"
+      ],
+      "decisions": 301,
+      "deterministic": 103,
+      "plan_reuses": 82,
+      "model_calls": 116,
+      "prompt_tokens": 243423,
+      "cache_hit_tokens": 69504,
+      "cache_hit_rate": 0.286,
+      "outcome": "death"
     }
   ]
 }
