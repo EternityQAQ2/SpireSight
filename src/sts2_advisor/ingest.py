@@ -33,6 +33,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--url", default="")
     parser.add_argument("--character", default="all")
     parser.add_argument("--decision-type", action="append", default=[])
+    parser.add_argument(
+        "--enemy", action="append", default=[],
+        help="攻略适用的敌人名（含别名），可重复；战斗检索只返回当前战斗中出现的敌人对应的攻略",
+    )
     parser.add_argument("--license", default="unknown")
     parser.add_argument("--store", choices=("json", "chroma", "both"), default="json")
     parser.add_argument("--chroma-path", type=Path, default=Path("data/chroma"))
@@ -53,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
                 "metadata": {
                     "character": args.character,
                     "decision_types": args.decision_type,
+                    "enemies": args.enemy,
                     "license": args.license,
                     "review_status": "unreviewed",
                 },
@@ -90,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
                         else "all"
                     ),
                     "decision_types": ",".join(record["metadata"]["decision_types"]),
+                    "enemies": ",".join(record["metadata"]["enemies"]),
                     "license": record["metadata"]["license"],
                     "review_status": record["metadata"]["review_status"],
                 }

@@ -448,6 +448,53 @@ class NormalizeTests(unittest.TestCase):
         assert context is not None
         self.assertEqual([candidate.candidate_id for candidate in context.candidates], ["card_select:confirm"])
 
+    def test_card_select_optional_multi_select_keeps_cards_after_first_pick(self) -> None:
+        context = build_decision_context(
+            {
+                "state_type": "card_select",
+                "run": {"act": 1, "floor": 3},
+                "player": {},
+                "card_select": {
+                    "cards": [
+                        {"index": 0, "name": "打击"},
+                        {"index": 1, "name": "防御"},
+                        {"index": 2, "name": "痛击"},
+                    ],
+                    "selected_cards": [{"index": 0, "name": "打击"}],
+                    "selected_count": 1,
+                    "preview_showing": False,
+                    "can_confirm": True,
+                    "can_cancel": True,
+                },
+            }
+        )
+        assert context is not None
+        self.assertEqual(
+            [candidate.candidate_id for candidate in context.candidates],
+            ["card_select:1", "card_select:2", "card_select:confirm", "card_select:cancel"],
+        )
+
+    def test_card_select_decision_id_ignores_rerolled_preview_cards(self) -> None:
+        def state(preview_name: str) -> dict:
+            return {
+                "state_type": "card_select",
+                "run": {"act": 2, "floor": 23},
+                "player": {},
+                "card_select": {
+                    "screen_type": "transform",
+                    "cards": [{"index": 0, "name": "打击"}, {"index": 1, "name": "防御"}],
+                    "selected_cards": [{"index": 0, "name": "打击"}],
+                    "preview_showing": True,
+                    "preview_cards": [{"index": 0, "name": preview_name}],
+                    "can_confirm": True,
+                },
+            }
+
+        first = build_decision_context(state("Serpent Form"))
+        second = build_decision_context(state("Bullet Time"))
+        assert first is not None and second is not None
+        self.assertEqual(first.decision_id, second.decision_id)
+
 
 if __name__ == "__main__":
     unittest.main()
