@@ -136,6 +136,12 @@ def compact_situation(raw: dict[str, Any]) -> dict[str, Any]:
         return {"battle": raw.get("battle", {}), "hand_select": raw.get("hand_select")}
     if state_type == "map":
         return {"map": compact_map(raw.get("map", {}))}
+    data = raw.get("card_select")
+    if state_type == "card_select" and isinstance(data, dict) and data.get("preview_showing") and data.get("can_confirm"):
+        # Preview confirms are deterministic (confirm is the only candidate), and the
+        # game re-rolls preview_cards on every poll; leaving them in would change
+        # decision_id each time and stop the watch loop from seeing a stable state.
+        return {"card_select": {k: v for k, v in data.items() if k != "preview_cards"}}
     key = "fake_merchant" if state_type == "fake_merchant" else state_type
     value = raw.get(key, {})
     return {key: value}

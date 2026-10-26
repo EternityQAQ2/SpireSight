@@ -1,290 +1,572 @@
 {
-  "generated_at": "2026-10-25T16:10:21.978713+00:00",
+  "generated_at": "2026-10-26T12:43:42.842602+00:00",
   "guides_dir": "guides",
-  "decision_types": [
+  "default_decision_types": [
     "card_reward",
     "shop"
   ],
-  "decision_types_note": "未显式指定时按类别自动选择（builds/bosses）",
+  "category_decision_types": {
+    "builds": [
+      "card_reward",
+      "shop"
+    ],
+    "bosses": [
+      "combat_next_action"
+    ]
+  },
+  "file_decision_types": {},
+  "enemy_aliases": {
+    "bosses/第一幕/同族小队.md": [
+      "同族小队",
+      "同族神官",
+      "同族信徒"
+    ],
+    "bosses/第二幕/帝皇蟹.md": [
+      "帝皇蟹",
+      "碾碎爪",
+      "火箭"
+    ],
+    "bosses/第三幕/女王.md": [
+      "女王",
+      "火炬头聚合体"
+    ]
+  },
+  "cli_decision_types": [],
   "entries": [
     {
-      "path": "guides\\bosses\\备战检查单.md",
+      "path": "bosses/第一幕/乐加维林族母.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "备战检查单",
-      "url": "https://www.spirebuilds.com/guides/boss-preparation-checklist",
-      "license": "spirebuilds.com，未标注"
+      "title": "乐加维林族母",
+      "url": "https://sts2.huijiwiki.com/wiki/乐加维林族母",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "乐加维林族母"
+      ]
     },
     {
-      "path": "guides\\bosses\\第一幕.md",
+      "path": "bosses/第一幕/仪式兽.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "第一幕",
-      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-1-overgrowth-and-underdocks",
-      "license": "spirebuilds.com，未标注"
+      "title": "仪式兽",
+      "url": "https://sts2.huijiwiki.com/wiki/仪式兽",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "仪式兽"
+      ]
     },
     {
-      "path": "guides\\bosses\\第三幕.md",
+      "path": "bosses/第一幕/同族小队.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "第三幕",
-      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-3-glory",
-      "license": "spirebuilds.com，未标注"
+      "title": "同族小队",
+      "url": "https://sts2.huijiwiki.com/wiki/同族小队",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "同族小队",
+        "同族神官",
+        "同族信徒"
+      ]
     },
     {
-      "path": "guides\\bosses\\第二幕.md",
+      "path": "bosses/第一幕/墨影幻灵.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "第二幕",
-      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#act-2-hive",
-      "license": "spirebuilds.com，未标注"
+      "title": "墨影幻灵",
+      "url": "https://sts2.huijiwiki.com/wiki/墨影幻灵",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "墨影幻灵"
+      ]
     },
     {
-      "path": "guides\\bosses\\药水与篝火.md",
+      "path": "bosses/第一幕/瀑布巨兽.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "药水与篝火",
-      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide#potion-and-campfire-decisions",
-      "license": "spirebuilds.com，未标注"
+      "title": "瀑布巨兽",
+      "url": "https://sts2.huijiwiki.com/wiki/瀑布巨兽",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "瀑布巨兽"
+      ]
     },
     {
-      "path": "guides\\bosses\\通用备战清单.md",
+      "path": "bosses/第一幕/灵魂异鱼.md",
       "category": "bosses",
-      "group": "bosses",
+      "group": "第一幕",
       "character": "all",
-      "title": "通用备战清单",
-      "url": "https://www.spirebuilds.com/guides/slay-the-spire-2-all-bosses-guide",
-      "license": "spirebuilds.com，未标注"
+      "title": "灵魂异鱼",
+      "url": "https://sts2.huijiwiki.com/wiki/灵魂异鱼",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "灵魂异鱼"
+      ]
     },
     {
-      "path": "guides\\builds\\亡灵契约师流派\\奥斯提召唤.md",
+      "path": "bosses/第三幕/女王.md",
+      "category": "bosses",
+      "group": "第三幕",
+      "character": "all",
+      "title": "女王",
+      "url": "https://sts2.huijiwiki.com/wiki/女王",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "女王",
+        "火炬头聚合体"
+      ]
+    },
+    {
+      "path": "bosses/第三幕/实验体.md",
+      "category": "bosses",
+      "group": "第三幕",
+      "character": "all",
+      "title": "实验体",
+      "url": "https://sts2.huijiwiki.com/wiki/实验体",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "实验体"
+      ]
+    },
+    {
+      "path": "bosses/第三幕/永世沙漏.md",
+      "category": "bosses",
+      "group": "第三幕",
+      "character": "all",
+      "title": "永世沙漏",
+      "url": "https://sts2.huijiwiki.com/wiki/永世沙漏",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "永世沙漏"
+      ]
+    },
+    {
+      "path": "bosses/第二幕/帝皇蟹.md",
+      "category": "bosses",
+      "group": "第二幕",
+      "character": "all",
+      "title": "帝皇蟹",
+      "url": "https://sts2.huijiwiki.com/wiki/帝皇蟹",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "帝皇蟹",
+        "碾碎爪",
+        "火箭"
+      ]
+    },
+    {
+      "path": "bosses/第二幕/无厌沙虫.md",
+      "category": "bosses",
+      "group": "第二幕",
+      "character": "all",
+      "title": "无厌沙虫",
+      "url": "https://sts2.huijiwiki.com/wiki/无厌沙虫",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "无厌沙虫"
+      ]
+    },
+    {
+      "path": "bosses/第二幕/知识恶魔.md",
+      "category": "bosses",
+      "group": "第二幕",
+      "character": "all",
+      "title": "知识恶魔",
+      "url": "https://sts2.huijiwiki.com/wiki/知识恶魔",
+      "license": "CC BY-NC-SA 灰机wiki",
+      "decision_types": [
+        "combat_next_action"
+      ],
+      "enemies": [
+        "知识恶魔"
+      ]
+    },
+    {
+      "path": "builds/亡灵契约师流派/奥斯提召唤.md",
       "category": "builds",
       "group": "亡灵契约师流派",
       "character": "亡灵契约师",
       "title": "亡灵契约师：奥斯提召唤",
       "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-osty",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\亡灵契约师流派\\死神重击.md",
+      "path": "builds/亡灵契约师流派/死神重击.md",
       "category": "builds",
       "group": "亡灵契约师流派",
       "character": "亡灵契约师",
       "title": "亡灵契约师：死神重击",
       "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-reaper-big-hit",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\亡灵契约师流派\\灵魂循环.md",
+      "path": "builds/亡灵契约师流派/灵魂循环.md",
       "category": "builds",
       "group": "亡灵契约师流派",
       "character": "亡灵契约师",
       "title": "亡灵契约师：灵魂循环",
       "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-soul-cycle",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\亡灵契约师流派\\灾厄斩杀.md",
+      "path": "builds/亡灵契约师流派/灾厄斩杀.md",
       "category": "builds",
       "group": "亡灵契约师流派",
       "character": "亡灵契约师",
       "title": "亡灵契约师：灾厄斩杀",
       "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-doom-execute",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\亡灵契约师流派\\虚无流.md",
+      "path": "builds/亡灵契约师流派/虚无流.md",
       "category": "builds",
       "group": "亡灵契约师流派",
       "character": "亡灵契约师",
       "title": "亡灵契约师：虚无流",
       "url": "https://slaythespire2.net/zh-CN/build/necrobinder?v=beta#build-ethereal",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\储君流派\\君王之剑铸造流.md",
+      "path": "builds/储君流派/君王之剑铸造流.md",
       "category": "builds",
       "group": "储君流派",
       "character": "储君",
       "title": "储君：君王之剑铸造流",
       "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-sovereign-blade-forge",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\储君流派\\星位序列循环.md",
+      "path": "builds/储君流派/星位序列循环.md",
       "category": "builds",
       "group": "储君流派",
       "character": "储君",
       "title": "储君：星位序列循环",
       "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-alignment-loop",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\储君流派\\虚空形态流.md",
+      "path": "builds/储君流派/虚空形态流.md",
       "category": "builds",
       "group": "储君流派",
       "character": "储君",
       "title": "储君：虚空形态流",
       "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-void-form",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\储君流派\\辉星引擎.md",
+      "path": "builds/储君流派/辉星引擎.md",
       "category": "builds",
       "group": "储君流派",
       "character": "储君",
       "title": "储君：辉星引擎",
       "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-star-engine",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\储君流派\\造牌流.md",
+      "path": "builds/储君流派/造牌流.md",
       "category": "builds",
       "group": "储君流派",
       "character": "储君",
       "title": "储君：造牌流",
       "url": "https://slaythespire2.net/zh-CN/build/regent?v=beta#build-card-creation",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\故障机器人流派\\0 费 Claw 流.md",
+      "path": "builds/故障机器人流派/0 费 Claw 流.md",
       "category": "builds",
       "group": "故障机器人流派",
       "character": "故障机器人",
       "title": "故障机器人：0 费 Claw 流",
       "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-claw-zero-cost",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\故障机器人流派\\冰霜集中球.md",
+      "path": "builds/故障机器人流派/冰霜集中球.md",
       "category": "builds",
       "group": "故障机器人流派",
       "character": "故障机器人",
       "title": "故障机器人：冰霜集中球",
       "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-frost-focus-orbs",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\故障机器人流派\\状态牌引擎.md",
+      "path": "builds/故障机器人流派/状态牌引擎.md",
       "category": "builds",
       "group": "故障机器人流派",
       "character": "故障机器人",
       "title": "故障机器人：状态牌引擎",
       "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-status-engine",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\故障机器人流派\\闪电能力引擎.md",
+      "path": "builds/故障机器人流派/闪电能力引擎.md",
       "category": "builds",
       "group": "故障机器人流派",
       "character": "故障机器人",
       "title": "故障机器人：闪电能力引擎",
       "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-lightning-power-engine",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\故障机器人流派\\黑暗球激发爆发.md",
+      "path": "builds/故障机器人流派/黑暗球激发爆发.md",
       "category": "builds",
       "group": "故障机器人流派",
       "character": "故障机器人",
       "title": "故障机器人：黑暗球激发爆发",
       "url": "https://slaythespire2.net/zh-CN/build/defect?v=beta#build-dark-orb-evoke-burst",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\铁甲战士流派\\力量流.md",
+      "path": "builds/铁甲战士流派/力量流.md",
       "category": "builds",
       "group": "铁甲战士流派",
       "character": "铁甲战士",
       "title": "铁甲战士：力量流",
       "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-strength-scaling",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\铁甲战士流派\\易伤流.md",
+      "path": "builds/铁甲战士流派/易伤流.md",
       "category": "builds",
       "group": "铁甲战士流派",
       "character": "铁甲战士",
       "title": "铁甲战士：易伤流",
       "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-vulnerable",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\铁甲战士流派\\格挡／全身撞击流.md",
+      "path": "builds/铁甲战士流派/格挡／全身撞击流.md",
       "category": "builds",
       "group": "铁甲战士流派",
       "character": "铁甲战士",
       "title": "铁甲战士：格挡／全身撞击流",
       "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-block-barricade",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\铁甲战士流派\\消耗流.md",
+      "path": "builds/铁甲战士流派/消耗流.md",
       "category": "builds",
       "group": "铁甲战士流派",
       "character": "铁甲战士",
       "title": "铁甲战士：消耗流",
       "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-exhaust-engine",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\铁甲战士流派\\自伤流.md",
+      "path": "builds/铁甲战士流派/自伤流.md",
       "category": "builds",
       "group": "铁甲战士流派",
       "character": "铁甲战士",
       "title": "铁甲战士：自伤流",
       "url": "https://slaythespire2.net/zh-CN/build/ironclad?v=beta#build-self-damage",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\静默猎手流派\\中毒流.md",
+      "path": "builds/静默猎手流派/中毒流.md",
       "category": "builds",
       "group": "静默猎手流派",
       "character": "静默猎手",
       "title": "静默猎手：中毒流",
       "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-poison",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\静默猎手流派\\奇巧弃牌流.md",
+      "path": "builds/静默猎手流派/奇巧弃牌流.md",
       "category": "builds",
       "group": "静默猎手流派",
       "character": "静默猎手",
       "title": "静默猎手：奇巧弃牌流",
       "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-sly-discard",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\静默猎手流派\\小刀流.md",
+      "path": "builds/静默猎手流派/小刀流.md",
       "category": "builds",
       "group": "静默猎手流派",
       "character": "静默猎手",
       "title": "静默猎手：小刀流",
       "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-shiv",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\静默猎手流派\\敏捷格挡流.md",
+      "path": "builds/静默猎手流派/敏捷格挡流.md",
       "category": "builds",
       "group": "静默猎手流派",
       "character": "静默猎手",
       "title": "静默猎手：敏捷格挡流",
       "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-dexterity-block",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     },
     {
-      "path": "guides\\builds\\静默猎手流派\\过牌节奏流.md",
+      "path": "builds/静默猎手流派/过牌节奏流.md",
       "category": "builds",
       "group": "静默猎手流派",
       "character": "静默猎手",
       "title": "静默猎手：过牌节奏流",
       "url": "https://slaythespire2.net/zh-CN/build/silent?v=beta#build-draw-tempo",
-      "license": "slaythespire2.net，未标注"
+      "license": "slaythespire2.net，未标注",
+      "decision_types": [
+        "card_reward",
+        "shop"
+      ],
+      "enemies": []
     }
   ]
 }

@@ -2,11 +2,18 @@
 
 用法（项目根目录执行，无需设置 PYTHONPATH）：
   python tools/ingest_guides.py                 # 增量 upsert
+  python tools/ingest_guides.py --dry-run       # 只打印入库计划，不写库
   python tools/ingest_guides.py --rebuild       # 清空 Chroma 与 JSONL 后全量重入（修订攻略后使用）
 
 从属规则：
   guides/<类别>/<X流派>/<名>.md  -> character=X（如 铁甲战士流派 -> 铁甲战士）
   其余路径                      -> character=all（避免元数据过滤误伤非流派攻略）
+
+决策类型（决定攻略会被注入哪种决策）按三级优先级解析：
+  1. 命令行 --decision-type（全局覆盖，测试用）
+  2. DECISION_TYPES_BY_FILE 单文件覆盖（相对 guides/ 的 posix 路径）
+  3. DECISION_TYPES_BY_CATEGORY 目录类别默认值
+
 来源 URL 取正文中的第一个 Markdown 链接；license 按域名映射，未收录域名记为 unknown。
 每次入库后把从属关系索引写入 data/manifests/guides_index.json。
 """
@@ -31,10 +38,26 @@ LICENSE_BY_DOMAIN = (
     ("spirebuilds.com", "spirebuilds.com，未标注"),
 )
 DEFAULT_DECISION_TYPES = ("card_reward", "shop")
-# 类别决定默认投放的决策界面；bosses 备战影响路线、篝火、商店与选牌。
+# 目录类别决定默认投放的决策界面。
+#   builds：构筑攻略，只在选牌和商店有用。
+#   bosses：目前放的是“怪物机制”，只在战斗决策（combat_next_action）里有意义。
+#           如果以后放回“Boss 备战”这类战略攻略，用下面的单文件覆盖指回
+#           map/rest_site/shop/card_reward，而不是改这里。
 DECISION_TYPES_BY_CATEGORY = {
     "builds": ("card_reward", "shop"),
-    "bosses": ("map", "rest_site", "shop", "card_reward"),
+    "bosses": ("combat_next_action",),
+}
+# 单文件覆盖：key 是相对 guides/ 的 posix 路径。
+# 例：想让某份 Boss 备战攻略重新进入地图与篝火决策：
+#   "bosses/通用备战清单.md": ("map", "rest_site", "shop", "card_reward"),
+DECISION_TYPES_BY_FILE: dict[str, tuple[str, ...]] = {}
+
+# Boss 攻略只在“当前战斗里真的出现这个敌人”时才有用。默认用文件名作为敌人名，
+# 多实体 Boss 在这里补别名（战斗状态里出现的是爪牙/信徒等实体名）。
+ENEMY_ALIASES_BY_FILE: dict[str, tuple[str, ...]] = {
+    "bosses/第一幕/同族小队.md": ("同族小队", "同族神官", "同族信徒"),
+    "bosses/第二幕/帝皇蟹.md": ("帝皇蟹", "碾碎爪", "火箭"),
+    "bosses/第三幕/女王.md": ("女王", "火炬头聚合体"),
 }
 
 
@@ -68,15 +91,43 @@ def plan_guides(root: Path) -> list[dict]:
         plans.append(
             {
                 "path": path,
+                "rel_path": path.relative_to(root).as_posix(),
                 "category": category or "guides",
                 "group": group,
                 "character": character,
                 "title": title,
+                "enemies": resolve_enemies(
+                    path.relative_to(root).as_posix(), category, title
+                ),
                 "url": url,
                 "license": license_for(url),
             }
         )
     return plans
+
+
+def resolve_enemies(rel_path: str, category: str, title: str) -> list[str]:
+    """Boss 攻略适用的敌人名；构筑/事件等非战斗攻略返回空列表。"""
+    if category != "bosses":
+        return []
+    if rel_path in ENEMY_ALIASES_BY_FILE:
+        return list(ENEMY_ALIASES_BY_FILE[rel_path])
+    return [title]
+
+
+def resolve_decision_types(rel_path: str, category: str, cli_override: list[str]) -> list[str]:
+    """按 CLI > 单文件 > 类别 > 默认的顺序解析决策类型。"""
+    if cli_override:
+        return list(cli_override)
+    if rel_path in DECISION_TYPES_BY_FILE:
+        return list(DECISION_TYPES_BY_FILE[rel_path])
+    return list(DECISION_TYPES_BY_CATEGORY.get(category, DEFAULT_DECISION_TYPES))
+
+
+def stale_file_overrides(plans: list[dict]) -> list[str]:
+    """返回写在 DECISION_TYPES_BY_FILE 里、但磁盘上已不存在的路径。"""
+    known = {item["rel_path"] for item in plans}
+    return sorted(path for path in DECISION_TYPES_BY_FILE if path not in known)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -87,37 +138,67 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--store", choices=("json", "chroma", "both"), default="both")
     parser.add_argument(
         "--decision-type", action="append", default=[],
-        help="覆盖默认决策类型（默认 card_reward + shop），可重复",
+        help="全局覆盖默认决策类型（默认按目录类别），可重复",
     )
     parser.add_argument(
         "--rebuild", action="store_true",
         help="先清空 Chroma 与 JSONL 再全量入库；chunk id 是内容哈希，修订后必须用本选项去陈旧副本",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="只打印每个文件的从属关系与决策类型，不写入 Chroma 或 JSONL",
+    )
     args = parser.parse_args(argv)
 
-    if args.rebuild:
-        shutil.rmtree(args.chroma_path, ignore_errors=True)
-        if args.jsonl.exists():
-            args.jsonl.write_text("", encoding="utf-8")
-        print(f"已清空 {args.chroma_path} 与 {args.jsonl}")
-
-    decision_types = args.decision_type or list(DEFAULT_DECISION_TYPES)
     plans = plan_guides(args.guides_dir)
     if not plans:
         print(f"{args.guides_dir} 下没有找到 .md 文件")
         return 1
 
+    for stale in stale_file_overrides(plans):
+        print(f"[警告] DECISION_TYPES_BY_FILE 里的路径不存在：{stale}")
+
+    if args.rebuild and not args.dry_run:
+        shutil.rmtree(args.chroma_path, ignore_errors=True)
+        if args.jsonl.exists():
+            args.jsonl.write_text("", encoding="utf-8")
+        print(f"已清空 {args.chroma_path} 与 {args.jsonl}")
+    elif args.rebuild and args.dry_run:
+        print("[dry-run] 跳过清空步骤")
+
     failed = 0
+    entries: list[dict] = []
     for item in plans:
-        effective_types = (
-            args.decision_type
-            or list(DECISION_TYPES_BY_CATEGORY.get(item["category"], DEFAULT_DECISION_TYPES))
+        effective_types = resolve_decision_types(
+            item["rel_path"], item["category"], args.decision_type
         )
-        print(f"[入库] {item['path'].relative_to(args.guides_dir)}")
-        print(f"        从属: 类别={item['category']} 组={item['group']} 角色={item['character']} 决策={','.join(effective_types)}")
+        item["decision_types"] = effective_types
+        entries.append(
+            {
+                "path": item["rel_path"],
+                "category": item["category"],
+                "group": item["group"],
+                "character": item["character"],
+                "title": item["title"],
+                "url": item["url"],
+                "license": item["license"],
+                "decision_types": effective_types,
+                "enemies": item["enemies"],
+            }
+        )
+
+        print(f"[{'计划' if args.dry_run else '入库'}] {item['rel_path']}")
+        print(
+            f"        从属: 类别={item['category']} 组={item['group']} "
+            f"角色={item['character']} 决策={','.join(effective_types)} "
+            f"敌人={','.join(item['enemies']) or '-'}"
+        )
         print(f"        来源: {item['url'] or '(未找到链接)'} | 许可: {item['license']}")
         if not item["url"]:
             print("        [警告] 正文没有来源链接，溯源信息不完整")
+        if args.dry_run:
+            continue
+
         argv_out = [
             str(item["path"]),
             "--store", args.store,
@@ -126,11 +207,16 @@ def main(argv: list[str] | None = None) -> int:
             "--url", item["url"],
             "--character", item["character"],
             *[flag for decision_type in effective_types for flag in ("--decision-type", decision_type)],
+            *[flag for enemy in item["enemies"] for flag in ("--enemy", enemy)],
             "--chroma-path", str(args.chroma_path),
             "--license", item["license"],
         ]
         if ingest_main(argv_out) != 0:
             failed += 1
+
+    if args.dry_run:
+        print(f"\n[dry-run] 共 {len(entries)} 个文件，未写入任何数据")
+        return 0
 
     manifest_path = Path("data/manifests/guides_index.json")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,12 +225,18 @@ def main(argv: list[str] | None = None) -> int:
             {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "guides_dir": str(args.guides_dir),
-                "decision_types": decision_types,
-                "decision_types_note": "未显式指定时按类别自动选择（builds/bosses）",
-                "entries": [
-                    {key: (str(value) if isinstance(value, Path) else value) for key, value in item.items()}
-                    for item in plans
-                ],
+                "default_decision_types": list(DEFAULT_DECISION_TYPES),
+                "category_decision_types": {
+                    key: list(value) for key, value in DECISION_TYPES_BY_CATEGORY.items()
+                },
+                "file_decision_types": {
+                    key: list(value) for key, value in DECISION_TYPES_BY_FILE.items()
+                },
+                "enemy_aliases": {
+                    key: list(value) for key, value in ENEMY_ALIASES_BY_FILE.items()
+                },
+                "cli_decision_types": list(args.decision_type),
+                "entries": entries,
             },
             ensure_ascii=False,
             indent=2,

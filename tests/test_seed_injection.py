@@ -97,16 +97,22 @@ class SeedInjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_seeds(bad)
 
-    def test_shipped_seeds_file_contains_survival_rule_and_default_wiring_uses_it(self):
+    def test_shipped_seeds_rules_present_and_routed_by_decision_type(self):
         # data/seeds.jsonl 属于仓库数据：规则被误删/改名/未随仓库分发时在此失败
         default_path = Path(__file__).resolve().parents[1] / "data" / "seeds.jsonl"
-        self.assertIn("builtin-combat-survival-001",
-                      {seed.evidence_id for seed in load_seeds(default_path)})
+        shipped = {seed.evidence_id for seed in load_seeds(default_path)}
+        self.assertIn("builtin-combat-survival-001", shipped)
+        self.assertIn("builtin-event-hp-trading-001", shipped)
         with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("json", self.root / "chroma", self.knowledge,
                                          facts_path=self.root / "missing.sqlite3")
-        evidence = retriever.retrieve(make_context("combat_next_action"))
-        self.assertIn("builtin-combat-survival-001", {item.evidence_id for item in evidence})
+        combat = {item.evidence_id for item in retriever.retrieve(make_context("combat_next_action"))}
+        event = {item.evidence_id for item in retriever.retrieve(make_context("event"))}
+        # 各自界面只注入各自基线，互不串场
+        self.assertIn("builtin-combat-survival-001", combat)
+        self.assertNotIn("builtin-event-hp-trading-001", combat)
+        self.assertIn("builtin-event-hp-trading-001", event)
+        self.assertNotIn("builtin-combat-survival-001", event)
 
 
 if __name__ == "__main__":

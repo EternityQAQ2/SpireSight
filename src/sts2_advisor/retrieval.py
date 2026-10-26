@@ -178,8 +178,10 @@ class ChromaRetriever:
         if self.collection.count() == 0:
             return []
         query = build_query(context)
-        record_event("retrieval.query", provider="chroma", query=query, top_k=top_k)
-        result = self.collection.query(query_texts=[query], n_results=top_k)
+        candidate_k = max(top_k * 3, 12)
+        record_event("retrieval.query", provider="chroma", query=query, top_k=top_k,
+                     candidate_k=candidate_k)
+        result = self.collection.query(query_texts=[query], n_results=candidate_k)
         record_event("retrieval.raw_result", provider="chroma", result=result)
         evidences: list[Evidence] = []
         ids = (result.get("ids") or [[]])[0]
@@ -198,7 +200,7 @@ class ChromaRetriever:
                     metadata=dict(metadata),
                 )
             )
-        return evidences
+        return evidences[:top_k]
 
 
 class SqliteFactsRetriever:
@@ -364,7 +366,27 @@ def metadata_matches(metadata: dict[str, Any], context: DecisionContext) -> bool
     character = metadata.get("character")
     if character and character not in {context.player.get("character"), "all", "*"}:
         return False
+    enemies = metadata.get("enemies")
+    if isinstance(enemies, str):
+        enemies = [item.strip() for item in enemies.split(",") if item.strip()]
+    if isinstance(enemies, list) and enemies:
+        # Boss/精英攻略只对“当前战斗里实际出现的敌人”生效。否则同类战斗词汇
+        # （造成伤害、回合、生命值）会让所有 Boss 攻略在普通战斗里抢占证据槽位。
+        if not set(enemies) & combat_enemy_names(context):
+            return False
     return True
+
+
+def combat_enemy_names(context: DecisionContext) -> set[str]:
+    """从紧凑局面中取出当前战斗的敌人名。"""
+    battle = context.situation.get("battle")
+    if not isinstance(battle, dict):
+        return set()
+    names: set[str] = set()
+    for enemy in battle.get("enemies") or []:
+        if isinstance(enemy, dict) and isinstance(enemy.get("name"), str):
+            names.add(enemy["name"])
+    return names
 
 
 def tokenize(text: str) -> set[str]:
