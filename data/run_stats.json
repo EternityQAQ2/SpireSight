@@ -928,6 +928,73 @@
       "cache_hit_tokens": 69504,
       "cache_hit_rate": 0.286,
       "outcome": "death"
+    },
+    {
+      "character": "铁甲战士",
+      "started_at": "2026-11-03T13:55:28.270086+00:00",
+      "ended_at": "2026-11-03T14:12:01.899818+00:00",
+      "max_floor": 22,
+      "max_act": 2,
+      "ascension": 0,
+      "final_hp": 0,
+      "max_hp": 89,
+      "game_over_observed": true,
+      "session_ids": [
+        "d3af2118-dd54-4875-801b-559b59e6f286"
+      ],
+      "decisions": 300,
+      "deterministic": 66,
+      "plan_reuses": 96,
+      "model_calls": 138,
+      "prompt_tokens": 378814,
+      "cache_hit_tokens": 127360,
+      "cache_hit_rate": 0.336,
+      "outcome": "death"
+    },
+    {
+      "character": "铁甲战士",
+      "started_at": "2026-11-03T14:28:37.390641+00:00",
+      "ended_at": "2026-11-03T14:44:36.014448+00:00",
+      "max_floor": 17,
+      "max_act": 1,
+      "ascension": 0,
+      "final_hp": 0,
+      "max_hp": 96,
+      "game_over_observed": true,
+      "session_ids": [
+        "ecfcc2f3-c0eb-413d-92ce-60c7d6b9724a",
+        "4d6b08a9-636f-4a09-8fad-bb480040ef81"
+      ],
+      "decisions": 244,
+      "deterministic": 68,
+      "plan_reuses": 81,
+      "model_calls": 97,
+      "prompt_tokens": 268336,
+      "cache_hit_tokens": 85632,
+      "cache_hit_rate": 0.319,
+      "outcome": "death"
+    },
+    {
+      "character": "铁甲战士",
+      "started_at": "2026-11-03T14:45:28.156487+00:00",
+      "ended_at": "2026-11-03T14:56:14.788810+00:00",
+      "max_floor": 13,
+      "max_act": 1,
+      "ascension": 0,
+      "final_hp": 0,
+      "max_hp": 80,
+      "game_over_observed": true,
+      "session_ids": [
+        "f4ed1fdc-cdb1-450c-b9c2-1fad8a971b25"
+      ],
+      "decisions": 191,
+      "deterministic": 54,
+      "plan_reuses": 69,
+      "model_calls": 68,
+      "prompt_tokens": 165209,
+      "cache_hit_tokens": 54528,
+      "cache_hit_rate": 0.33,
+      "outcome": "death"
     }
   ]
 }
