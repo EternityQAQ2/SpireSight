@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from sts2_advisor.combat import (
-    candidate_metrics,
-    combat_summary,
-    enemy_incoming,
-    incoming_damage,
-)
-from sts2_advisor.domain import Candidate, DecisionContext
-from sts2_advisor.model import model_context_payload
+from sts2_advisor.decision.metrics import candidate_metrics
+from sts2_advisor.game.combat.facts import combat_summary, enemy_incoming, incoming_damage
+from sts2_advisor.contracts import Candidate, DecisionContext
+from sts2_advisor.decision.context import model_context_payload
 
 
 def enemy(

@@ -5,21 +5,20 @@ import json
 import sys
 import time
 from contextlib import nullcontext
-from dataclasses import replace
 from typing import Callable
 
-from .action import ActionExecutor
-from .api import Sts2ApiError, Sts2RestClient
-from .domain import Advice, DecisionContext
-from .model import AdvisorBackend, RuleAdvisor
-from .logging_config import get_logger
-from .normalize import build_decision_context
-from .planning import ActivePlan
-from .recording import SessionRecorder
-from .record import record_event, trace_scope
-from .render import render_console
-from .retrieval import Retriever
-from .validation import AdviceValidationError, validate_advice
+from sts2_advisor.contracts import (
+    Advice, DecisionContext, GameClient, ActionExecutorPort, DecisionRecorder,
+    Sts2ApiError, AdvisorBackend, Retriever,
+)
+from sts2_advisor.decision.policy import repair_plan_if_current_action_is_legal
+from sts2_advisor.decision.survival import avoid_proven_death
+from sts2_advisor.recording.logging import get_logger
+from sts2_advisor.game.state import StateBuilder
+from sts2_advisor.decision.plans import ActivePlan
+from sts2_advisor.recording.trajectory import record_event, trace_scope
+from sts2_advisor.decision.render import render_console
+from sts2_advisor.decision.validation import AdviceValidationError, validate_advice
 
 
 logger = get_logger("service")
@@ -28,15 +27,16 @@ logger = get_logger("service")
 class AdvisorService:
     def __init__(
         self,
-        client: Sts2RestClient,
+        client: GameClient,
         retriever: Retriever,
         backend: AdvisorBackend,
-        recorder: SessionRecorder,
+        recorder: DecisionRecorder,
         *,
         backend_name: str,
         fallback_backend: AdvisorBackend | None = None,
         top_k: int = 6,
-        auto_act: bool = False,
+        action_executor: ActionExecutorPort | None = None,
+        state_builder: StateBuilder | None = None,
         output: Callable[[str], None] = print,
     ) -> None:
         self.client = client
@@ -47,7 +47,8 @@ class AdvisorService:
         self.recorder = recorder
         self.trajectory = getattr(recorder, "trajectory", None)
         self.top_k = top_k
-        self.action_executor = ActionExecutor(client, output=output) if auto_act else None
+        self.state_builder = state_builder or StateBuilder()
+        self.action_executor = action_executor
         self.output = output
         self.last_decision_id: str | None = None
         self.active_plan: ActivePlan | None = None
@@ -55,6 +56,9 @@ class AdvisorService:
         self._plan_origin_step_id: str | None = None
         self._current_step_id: str | None = None
         self._last_observation_digest: str | None = None
+
+    def _build_context(self, raw: dict) -> DecisionContext | None:
+        return self.state_builder(raw)
 
     def _read_state(self) -> dict:
         with trace_scope(self.trajectory):
@@ -83,7 +87,7 @@ class AdvisorService:
 
     def _refresh_run_stats(self) -> None:
         try:
-            from .runstats import refresh
+            from sts2_advisor.recording.stats import refresh
 
             count = refresh()
             self.output(f"检测到对局结束，战绩统计已更新（{count} 局）：docs/run-stats.md")
@@ -92,7 +96,7 @@ class AdvisorService:
 
     def run_once(self, *, force: bool = False) -> bool:
         raw_state = self._read_state()
-        context = build_decision_context(raw_state)
+        context = self._build_context(raw_state)
         if context is None:
             state_type = raw_state.get("state_type", "unknown")
             self.output(f"当前状态 {state_type!r} 没有可建议的决策，保持等待。")
@@ -112,7 +116,7 @@ class AdvisorService:
         while True:
             try:
                 raw_state = self._read_state()
-                context = build_decision_context(raw_state)
+                context = self._build_context(raw_state)
                 current_id = context.decision_id if context else None
                 if current_id == observed_id:
                     observed_count += 1
@@ -212,13 +216,21 @@ class AdvisorService:
         return self._deliver(raw_state, context, evidence, advice, backend_name)
 
     def _deliver(self, raw_state, context, evidence, advice, backend_name: str) -> Advice:
+        guarded = avoid_proven_death(advice, context)
+        if guarded is not advice:
+            record_event("decision.survival_override", original=advice.to_dict(), replacement=guarded.to_dict())
+            self.active_plan = None
+            advice = guarded
         rendered = render_console(advice, context, evidence)
         record_event("decision.output", backend=backend_name, advice=advice.to_dict(), rendered=rendered)
         self.output("\n" + rendered + "\n")
         self._record_safely(raw_state, context, evidence, advice, backend_name)
         if self.action_executor:
             try:
-                self.action_executor.execute(advice, context)
+                result = self.action_executor.execute(advice, context)
+                if result is not None and result.get("status") == "ok":
+                    candidate = next(c for c in context.candidates if c.candidate_id == advice.candidate_id)
+                    self.state_builder.deck_tracker.accepted_action(raw_state, candidate)
             finally:
                 self.last_decision_id = self.action_executor.last_decision_id
         else:
@@ -245,29 +257,3 @@ def deterministic_advice(context: DecisionContext) -> Advice | None:
         confidence=1.0,
         plan_candidate_ids=[candidate.candidate_id],
     )
-
-
-def repair_plan_if_current_action_is_legal(
-    advice: Advice, context: DecisionContext,
-) -> tuple[Advice, str | None]:
-    """Keep a legal immediate action when only the optional future plan is invalid."""
-    candidate_ids = {candidate.candidate_id for candidate in context.candidates}
-    if advice.candidate_id not in candidate_ids:
-        return advice, None
-
-    plan = list(dict.fromkeys(advice.plan_candidate_ids))
-    if not plan:
-        return advice, None
-    if plan[0] != advice.candidate_id:
-        reason = "plan_first_step_mismatch"
-    elif invalid_steps := sorted(set(plan) - candidate_ids):
-        reason = f"illegal_plan_steps:{','.join(invalid_steps)}"
-    else:
-        return advice, None
-
-    warning = "模型后续计划无效，已仅保留当前动作。"
-    return replace(
-        advice,
-        warnings=list(dict.fromkeys([*advice.warnings, warning])),
-        plan_candidate_ids=[advice.candidate_id],
-    ), reason

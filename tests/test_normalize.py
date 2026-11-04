@@ -5,10 +5,10 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from sts2_advisor.domain import Advice
-from sts2_advisor.model import RuleAdvisor
-from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.validation import AdviceValidationError, validate_advice
+from sts2_advisor.contracts import Advice
+from sts2_advisor.integrations.models.rules import RuleAdvisor
+from sts2_advisor.game.state import build_decision_context
+from sts2_advisor.decision.validation import AdviceValidationError, validate_advice
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"

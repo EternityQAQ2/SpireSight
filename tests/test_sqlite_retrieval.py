@@ -8,10 +8,12 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
-from sts2_advisor.domain import DecisionContext
-from sts2_advisor.model import build_prompt
-from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.retrieval import SqliteFactsRetriever, create_retriever, metadata_matches
+from sts2_advisor.contracts import DecisionContext
+from sts2_advisor.decision.prompts import build_prompt
+from sts2_advisor.game.state import build_decision_context
+from sts2_advisor.integrations.knowledge.sqlite import SqliteFactsRetriever
+from sts2_advisor.integrations.knowledge.factory import create_retriever
+from sts2_advisor.integrations.knowledge.common import metadata_matches
 from tools.build_wiki_db import SCHEMA_SQL
 
 
@@ -135,7 +137,7 @@ class SqliteRetrievalTests(unittest.TestCase):
         self.assertNotIn("sqlite:cards:pile_only", ids)
 
     def test_auto_combines_sqlite_facts_with_existing_guides_and_respects_top_k(self):
-        with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
+        with patch("sts2_advisor.integrations.knowledge.factory.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
                                          facts_path=self.db, seeds_path=self.seeds)
         evidence = retriever.retrieve(self.context, 3)
@@ -146,7 +148,7 @@ class SqliteRetrievalTests(unittest.TestCase):
 
     def test_missing_database_falls_back_without_creating_it(self):
         missing = self.root / "missing.sqlite3"
-        with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
+        with patch("sts2_advisor.integrations.knowledge.factory.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("auto", self.root / "chroma", self.knowledge,
                                          facts_path=missing, seeds_path=self.seeds)
         self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], ["survival-guide"])

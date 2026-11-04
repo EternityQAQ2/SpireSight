@@ -3,8 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from sts2_advisor.domain import DecisionContext
-from sts2_advisor.retrieval import ChromaRetriever, metadata_matches
+from sts2_advisor.contracts import DecisionContext
+from sts2_advisor.integrations.knowledge.chroma import ChromaRetriever
+from sts2_advisor.integrations.knowledge.common import metadata_matches
 
 
 def combat_context(enemies: list[str], decision_type: str = "combat_next_action") -> DecisionContext:
@@ -84,7 +85,7 @@ class ChromaCandidatePoolTests(unittest.TestCase):
             {"decision_types": "combat_next_action", "enemies": "墨影幻灵", "source_title": "墨影幻灵"},
         ]
         retriever, calls = self._retriever(metadatas)
-        with patch("sts2_advisor.retrieval.record_event"):
+        with patch("sts2_advisor.integrations.knowledge.chroma.record_event"):
             evidence = retriever.retrieve(combat_context(["墨影幻灵"]), top_k=5)
         self.assertEqual(calls["n_results"], 15)
         self.assertEqual([item.source_title for item in evidence], ["墨影幻灵"])
@@ -95,7 +96,7 @@ class ChromaCandidatePoolTests(unittest.TestCase):
             for _ in range(8)
         ]
         retriever, _ = self._retriever(metadatas)
-        with patch("sts2_advisor.retrieval.record_event"):
+        with patch("sts2_advisor.integrations.knowledge.chroma.record_event"):
             evidence = retriever.retrieve(combat_context(["墨影幻灵"]), top_k=3)
         self.assertEqual(len(evidence), 3)
 
@@ -105,7 +106,7 @@ class ChromaCandidatePoolTests(unittest.TestCase):
             {"decision_types": "combat_next_action", "enemies": "同族小队", "source_title": "同族小队"},
         ]
         retriever, _ = self._retriever(metadatas)
-        with patch("sts2_advisor.retrieval.record_event"):
+        with patch("sts2_advisor.integrations.knowledge.chroma.record_event"):
             evidence = retriever.retrieve(combat_context(["毛绒伏地虫"]), top_k=6)
         self.assertEqual(evidence, [])
 

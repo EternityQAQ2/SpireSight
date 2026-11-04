@@ -109,7 +109,7 @@ $env:PYTHONPATH="src"
 
 ```python
 from pathlib import Path
-from sts2_advisor.record import iter_events
+from sts2_advisor.recording.trajectory import iter_events
 
 for event in iter_events(Path("recordings/trajectories.sqlite3"), session_id):
     print(event["sequence"], event["step_index"], event["event_type"])

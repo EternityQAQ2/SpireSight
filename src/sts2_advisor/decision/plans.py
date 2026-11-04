@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
-from .domain import Advice, Candidate, DecisionContext, Evidence
+from sts2_advisor.contracts import Advice, Candidate, DecisionContext, Evidence
+from sts2_advisor.decision.plan_check import check_plan
+from sts2_advisor.game.combat.effects import energy_cost, energy_gain
 
 
 PLANNABLE_DECISIONS = {"combat_next_action", "shop", "fake_merchant", "rewards"}
@@ -65,6 +67,9 @@ class ActivePlan:
                 rebound.append(candidate)
                 available.remove(candidate)
             if rebound:
+                checked = check_plan(context, [c.candidate_id for c in rebound])
+                if checked.error or checked.boundary or checked.candidate_ids != [c.candidate_id for c in rebound]:
+                    continue
                 resolved = rebound
                 break
         if resolved is None:
@@ -206,8 +211,22 @@ def combat_transition_is_safe(
         or not new_battle.get("is_play_phase", False)
     ):
         return False
+    old_intents = {e.get("entity_id"): e.get("intents") for e in old_battle.get("enemies", [])}
+    if any(e.get("intents") != old_intents.get(e.get("entity_id")) for e in new_battle.get("enemies", [])):
+        return False
 
     old_hand = previous.player.get("hand", [])
+    expected_energy = int(previous.player.get("energy") or 0)
+    for step in completed:
+        card = next((c for c in old_hand if c.get("index") == step.params.get("card_index")), None)
+        if card is None:
+            return False
+        cost = energy_cost(card, expected_energy)
+        if cost is None or cost > expected_energy:
+            return False
+        expected_energy += energy_gain(card) - cost
+    if expected_energy != int(current.player.get("energy") or 0):
+        return False
     expected = Counter(card_signature(card) for card in old_hand)
     for step in completed:
         card_index = step.params.get("card_index")

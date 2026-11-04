@@ -9,15 +9,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from .record import record_event
-
-
-class Sts2ApiError(RuntimeError):
-    pass
-
-
-class Sts2ActionRejectedError(Sts2ApiError):
-    """服务器已处理请求并明确拒绝该动作（status != ok），动作未执行。"""
+from sts2_advisor.recording.trajectory import record_event
+from sts2_advisor.contracts import Sts2ApiError, Sts2ActionRejectedError
 
 
 class Sts2RestClient:
@@ -83,4 +76,3 @@ class Sts2RestClient:
         if isinstance(payload, dict):
             return str(payload.get("error") or payload.get("message") or payload)
         return str(payload)
-

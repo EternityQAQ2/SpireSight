@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sts2_advisor.runstats import DEFAULT_DB, DEFAULT_JSON, DEFAULT_MD, refresh  # noqa: E402
+from sts2_advisor.recording.stats import DEFAULT_DB, DEFAULT_JSON, DEFAULT_MD, refresh
 
 
 def main() -> int:

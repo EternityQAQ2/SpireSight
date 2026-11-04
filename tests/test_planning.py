@@ -5,11 +5,11 @@ import json
 import unittest
 from pathlib import Path
 
-from sts2_advisor.domain import Advice, Candidate, DecisionContext
-from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.planning import ActivePlan
-from sts2_advisor.service import AdvisorService
-from sts2_advisor.validation import AdviceValidationError, validate_advice
+from sts2_advisor.contracts import Advice, Candidate, DecisionContext
+from sts2_advisor.game.state import build_decision_context
+from sts2_advisor.decision.plans import ActivePlan
+from sts2_advisor.application.advisor import AdvisorService
+from sts2_advisor.decision.validation import AdviceValidationError, validate_advice
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"
@@ -47,7 +47,8 @@ class PlanningTests(unittest.TestCase):
         ]
         for index, card in enumerate(raw["player"]["hand"]):
             card["index"] = index
-        raw["player"]["energy"] -= len(played_candidates)
+        raw["player"]["energy"] -= sum(int(card["cost"]) for card in self.raw["player"]["hand"]
+                                         if card["index"] in played_indices)
         return raw
 
     def test_reuses_plan_and_rebinds_shifted_card_index(self) -> None:
@@ -69,7 +70,7 @@ class PlanningTests(unittest.TestCase):
         assert current is not None
         self.assertIsNone(self.make_plan().advance(current))
 
-    def test_plan_survives_mid_turn_card_text_mutation(self) -> None:
+    def test_plan_invalidates_when_changed_effect_or_cost_is_unknown(self) -> None:
         raw = self.state_after_first_card()
         for card in raw["player"]["hand"]:
             card["description"] = "力量变化改写了卡牌说明"
@@ -77,7 +78,17 @@ class PlanningTests(unittest.TestCase):
         current = build_decision_context(raw)
         assert current is not None
         advice = self.make_plan().advance(current)
-        self.assertIsNotNone(advice)
+        self.assertIsNone(advice)
+
+    def test_plan_rechecks_changed_numeric_cost_and_unexpected_energy(self) -> None:
+        raw = self.state_after_first_card()
+        raw["player"]["hand"][0]["cost"] = "3"
+        current = build_decision_context(raw)
+        self.assertIsNone(self.make_plan().advance(current))
+        raw = self.state_after_first_card()
+        raw["player"]["energy"] = 3
+        current = build_decision_context(raw)
+        self.assertIsNone(self.make_plan().advance(current))
 
     def test_plan_delivers_final_end_turn_step(self) -> None:
         end_turn = next(
@@ -100,6 +111,9 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(cached.candidate_id, end_turn.candidate_id)
 
     def test_recognizes_multiple_manually_completed_plan_steps(self) -> None:
+        # These three fixture cards cost 1+2+1, not three energy.
+        self.raw["player"]["energy"] = 4
+        self.context = build_decision_context(self.raw)
         third = self.playable[2]
         advice = Advice(
             self.context.decision_id,

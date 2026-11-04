@@ -6,12 +6,16 @@ import os
 import sys
 from pathlib import Path
 
-from .api import Sts2ApiError, Sts2RestClient
-from .logging_config import configure_logging, get_logger
-from .model import OpenAIAdvisor, RuleAdvisor, TransformersAdvisor
-from .recording import SessionRecorder
-from .retrieval import create_retriever
-from .service import AdvisorService
+from sts2_advisor.integrations.sts2.client import Sts2ApiError, Sts2RestClient
+from sts2_advisor.recording.logging import configure_logging, get_logger
+from sts2_advisor.integrations.models.remote import OpenAIAdvisor
+from sts2_advisor.integrations.models.rules import RuleAdvisor
+from sts2_advisor.integrations.models.local import TransformersAdvisor
+from sts2_advisor.recording.session import SessionRecorder
+from sts2_advisor.integrations.knowledge.factory import create_retriever
+from sts2_advisor.application.advisor import AdvisorService
+from sts2_advisor.integrations.sts2.actions import ActionExecutor
+from sts2_advisor.game.state import StateBuilder
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -119,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
 
     client = Sts2RestClient(args.base_url, args.timeout)
     if args.dump_context:
-        from .normalize import build_decision_context
+        from sts2_advisor.game.state import build_decision_context
 
         try:
             raw = client.get_singleplayer_state()
@@ -169,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_tokens=remote_max_tokens,
                 json_mode=environment_flag("OPENAI_JSON_MODE", True),
                 thinking=thinking,
+                function_calling=environment_flag("OPENAI_FUNCTION_CALLING", True),
             )
         except Exception as exc:
             print(f"远程模型配置失败：{exc}", file=sys.stderr)
@@ -186,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
     recorder = SessionRecorder(
         args.recording_dir, not args.no_record, metadata={"config": vars(args)},
     )
+    state_builder = StateBuilder()
+    executor = ActionExecutor(client, context_builder=state_builder) if args.auto_act else None
     service = AdvisorService(
         client,
         retriever,
@@ -194,7 +201,8 @@ def main(argv: list[str] | None = None) -> int:
         backend_name=args.backend,
         fallback_backend=fallback,
         top_k=args.top_k,
-        auto_act=args.auto_act,
+        action_executor=executor,
+        state_builder=state_builder,
     )
     session_status = "completed"
     try:
@@ -219,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.no_record:
             # 会话轨迹已落库，退出时顺手刷新战绩报表；失败不阻断退出。
             try:
-                from .runstats import refresh
+                from sts2_advisor.recording.stats import refresh
 
                 count = refresh()
                 print(f"战绩统计已更新（{count} 局）：docs/run-stats.md")

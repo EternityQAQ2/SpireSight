@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from sts2_advisor import model
+from sts2_advisor.integrations.models import local as model
 from sts2_advisor.cli import build_parser
 
 

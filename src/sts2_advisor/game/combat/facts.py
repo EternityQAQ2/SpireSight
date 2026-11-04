@@ -1,20 +1,17 @@
-"""战斗局面的算术层：只做解析与求和，不替模型做策略选择。
-
-提示词里敌人意图是「造成6点伤害3次」这类自然语言，模型直接心算容易只取
-第一段伤害。这里统一把单段伤害、段数、格挡、荆棘反伤换算成结构化数字，
-供提示词与规则后端共用。
-"""
-
+"""Read displayed combat facts. Unknown effects are not simulated here."""
 from __future__ import annotations
 
 import re
 from typing import Any
-
-from .domain import Candidate, DecisionContext
+from sts2_advisor.contracts import Candidate, DecisionContext
 
 
 ATTACK_DAMAGE_RE = re.compile(r"造成(\d+)点伤害(?:\s*(\d+)\s*次)?")
+
+
 BLOCK_RE = re.compile(r"获得(\d+)点格挡")
+
+
 ALL_ENEMIES_MARK = "对所有敌人"
 
 
@@ -63,8 +60,6 @@ def enemy_thorns(enemy: dict) -> int:
 
 
 def card_block(card: dict) -> int:
-    if card.get("type") != "Skill":
-        return 0
     match = BLOCK_RE.search(str(card.get("description") or ""))
     return int(match.group(1)) if match else 0
 
@@ -99,39 +94,6 @@ def target_thorns(candidate: Candidate, enemies: list[dict]) -> int:
     return max((enemy_thorns(enemy) for enemy in enemies), default=0)
 
 
-def candidate_metrics(
-    candidate: Candidate, card: dict | None, enemies: list[dict],
-) -> dict[str, int]:
-    """一张牌针对当前候选的实际数值：伤害、段数、自伤、格挡。
-
-    只对 play_card 生效；无法从描述解析的攻击（如全身撞击）不猜伤害。
-    """
-    if card is None or candidate.action_type != "play_card":
-        return {}
-    metrics: dict[str, int] = {}
-    block = card_block(card)
-    if block:
-        metrics["block"] = block
-    text = str(card.get("description") or "")
-    per_hit = card_damage_per_hit(card)
-    if not per_hit:
-        return metrics
-    hits = card_hits(card, len(enemies))
-    if ALL_ENEMIES_MARK in text:
-        metrics["dmg"] = per_hit
-        if hits > 1:
-            metrics["hits"] = hits
-        self_damage = sum(enemy_thorns(enemy) for enemy in enemies)
-    else:
-        metrics["dmg"] = per_hit * hits
-        if hits > 1:
-            metrics["hits"] = hits
-        self_damage = target_thorns(candidate, enemies) * hits
-    if self_damage:
-        metrics["self_damage"] = self_damage
-    return metrics
-
-
 def combat_summary(context: DecisionContext) -> dict[str, Any] | None:
     """给提示词用的本回合威胁摘要；非战斗局面返回 None。"""
     battle = context.situation.get("battle")
@@ -144,11 +106,15 @@ def combat_summary(context: DecisionContext) -> dict[str, Any] | None:
     total = 0
     total_hits = 0
     attackers: list[str] = []
+    unknown_intents: list[str] = []
     for enemy in enemies:
         damage, hits = enemy_incoming(enemy)
         total += damage
         total_hits += hits
         name = str(enemy.get("name") or enemy.get("entity_id") or "")
+        if any(i.get("type") == "Attack" and not ATTACK_DAMAGE_RE.search(str(i.get("description", "")))
+               for i in enemy.get("intents", []) if isinstance(i, dict)):
+            unknown_intents.append(name)
         if damage:
             attackers.append(name)
         hp = int(enemy.get("hp") or 0)
@@ -169,6 +135,8 @@ def combat_summary(context: DecisionContext) -> dict[str, Any] | None:
     unblocked = max(0, total - player_block)
     return {
         "incoming_damage": total,
+        "incoming_damage_known": not unknown_intents,
+        "unknown_attack_intents": unknown_intents,
         "incoming_hits": total_hits,
         "block": player_block,
         "unblocked_damage": unblocked,

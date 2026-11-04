@@ -13,11 +13,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from .api import Sts2ActionRejectedError, Sts2ApiError, Sts2RestClient
-from .domain import Advice, DecisionContext
-from .normalize import build_decision_context
-from .record import record_event
-from .validation import AdviceValidationError
+from sts2_advisor.integrations.sts2.client import Sts2ActionRejectedError, Sts2ApiError, Sts2RestClient
+from sts2_advisor.contracts import Advice, DecisionContext
+from sts2_advisor.game.state import build_decision_context
+from sts2_advisor.recording.trajectory import record_event
+from sts2_advisor.decision.validation import AdviceValidationError
 
 
 # 纯界面导航类动作，重复发送最坏只得到一次无害报错，可在被明确拒绝后安全重试一次；
@@ -90,9 +90,11 @@ def action(
 class ActionExecutor:
     """把推荐候选转成动作；每个稳定决策最多尝试发送一次。"""
 
-    def __init__(self, client: Sts2RestClient, *, output: Callable[[str], None] = print) -> None:
+    def __init__(self, client: Sts2RestClient, *, output: Callable[[str], None] = print,
+                 context_builder: Callable[[dict], DecisionContext | None] = build_decision_context) -> None:
         self.client = client
         self.output = output
+        self.context_builder = context_builder
         self.last_decision_id: str | None = None
         self._retried_decision_id: str | None = None
 
@@ -110,7 +112,7 @@ class ActionExecutor:
             return None
         latest_raw = self.client.get_singleplayer_state()
         record_event("action.precheck", raw_state=latest_raw)
-        latest = build_decision_context(latest_raw)
+        latest = self.context_builder(latest_raw)
         if latest is None or latest.decision_id != context.decision_id:
             record_event("action.skipped", reason="stale", decision_id=context.decision_id,
                          latest_decision_id=latest.decision_id if latest else None)

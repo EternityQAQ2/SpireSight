@@ -4,8 +4,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .domain import Advice, DecisionContext, Evidence
-from .record import TrajectoryRecorder
+from sts2_advisor.contracts import Advice, DecisionContext, Evidence
+from sts2_advisor.recording.trajectory import TrajectoryRecorder
 
 
 class SessionRecorder:
@@ -42,4 +42,3 @@ class SessionRecorder:
         }
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n")
-

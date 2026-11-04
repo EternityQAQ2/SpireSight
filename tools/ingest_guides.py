@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from sts2_advisor.ingest import main as ingest_main  # noqa: E402
+from sts2_advisor.integrations.knowledge.ingest import main as ingest_main
 
 
 LICENSE_BY_DOMAIN = (

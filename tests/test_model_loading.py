@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from sts2_advisor.model import TransformersAdvisor
+from sts2_advisor.integrations.models.local import TransformersAdvisor
 
 
 class ModelLoadingTests(unittest.TestCase):

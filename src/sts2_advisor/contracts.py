@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,45 @@ class Advice:
     evidence_ids: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     plan_candidate_ids: list[str] = field(default_factory=list)
+    selection_analysis: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+
+@dataclass(frozen=True)
+class PlanCheck:
+    candidate_ids: list[str]
+    error: str | None = None
+    boundary: str | None = None
+
+
+class AdvisorBackend(Protocol):
+    def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice: ...
+
+
+class Retriever(Protocol):
+    def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]: ...
+
+
+class GameClient(Protocol):
+    def get_singleplayer_state(self) -> dict[str, Any]: ...
+
+
+class ActionExecutorPort(Protocol):
+    last_decision_id: str | None
+
+    def execute(self, advice: Advice, context: DecisionContext) -> dict | None: ...
+
+
+class DecisionRecorder(Protocol):
+    def record(self, raw_state: dict, context: DecisionContext, evidence: list[Evidence],
+               advice: Advice, backend: str) -> None: ...
+
+
+class Sts2ApiError(RuntimeError):
+    """Game observation or action transport failed."""
+
+
+class Sts2ActionRejectedError(Sts2ApiError):
+    """The game explicitly rejected the action; it was not executed."""
