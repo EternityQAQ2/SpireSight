@@ -22,6 +22,7 @@ EVENT_STATS = {
     "decision.deterministic": "deterministic",
     "plan.reused": "plan_reuses",
     "model.response": "model_calls",
+    "model.tool_result": "tool_calls",
 }
 
 OUTCOME_LABEL = {"death": "死亡", "victory": "胜利(推断)", "aborted": "中途停止"}
@@ -65,14 +66,14 @@ def load_events(db: Path) -> list[dict]:
     conn = sqlite3.connect(db)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT timestamp, event_type, payload_json FROM events "
+        "SELECT timestamp, step_id, event_type, payload_json FROM events "
         "WHERE event_type IN ('decision.input', 'decision.deterministic', "
-        "'plan.reused', 'model.response') ORDER BY event_id"
+        "'plan.reused', 'model.response', 'model.tool_result') ORDER BY event_id"
     ).fetchall()
     conn.close()
     events = []
     for row in rows:
-        item = {"timestamp": row["timestamp"], "event_type": row["event_type"]}
+        item = {"timestamp": row["timestamp"], "step_id": row["step_id"], "event_type": row["event_type"]}
         if row["event_type"] == "model.response":
             try:
                 payload = json.loads(row["payload_json"])
@@ -81,6 +82,15 @@ def load_events(db: Path) -> list[dict]:
             usage = payload.get("usage") or {}
             item["prompt_tokens"] = int(usage.get("prompt_tokens") or 0)
             item["hit"] = int(payload.get("cache_hit_tokens") or 0)
+        elif row["event_type"] == "model.tool_result":
+            try:
+                result = (json.loads(row["payload_json"]).get("result") or {})
+            except json.JSONDecodeError:
+                result = {}
+            item["tool_exact"] = bool(result.get("exact"))
+            item["tool_error"] = result.get("ok") is False
+            item["tool_blockers"] = result.get("unsupported_mechanics") or []
+            item["tool_undetailed"] = not item["tool_exact"] and not item["tool_blockers"]
         events.append(item)
     return events
 
@@ -155,6 +165,8 @@ def outcome_of(run: dict) -> str:
 
 def attach_events(runs: list[dict], events: list[dict]) -> None:
     counters = [Counter() for _ in runs]
+    blockers = [Counter() for _ in runs]
+    steps_with_tool: set[str] = set()
     run_index = 0
     for event in events:
         while run_index < len(runs) and event["timestamp"] > runs[run_index]["ended_at"]:
@@ -167,7 +179,17 @@ def attach_events(runs: list[dict], events: list[dict]) -> None:
             if event["event_type"] == "model.response":
                 counters[run_index]["prompt_tokens"] += event["prompt_tokens"]
                 counters[run_index]["cache_hit_tokens"] += event["hit"]
-    for run, counter in zip(runs, counters):
+                if event["step_id"] in steps_with_tool:
+                    counters[run_index]["tool_followup_calls"] += 1
+                    counters[run_index]["tool_followup_prompt_tokens"] += event["prompt_tokens"]
+            elif event["event_type"] == "model.tool_result":
+                blockers[run_index].update(event.get("tool_blockers", []))
+                counters[run_index]["tool_undetailed"] += int(event.get("tool_undetailed", False))
+                if event["step_id"]:
+                    steps_with_tool.add(event["step_id"])
+                counters[run_index]["tool_exact"] += int(event["tool_exact"])
+                counters[run_index]["tool_errors"] += int(event["tool_error"])
+    for run, counter, reasons in zip(runs, counters, blockers):
         run.pop("last_session_id", None)
         run.update({key: counter.get(key, 0) for key in EVENT_STATS.values()})
         run["prompt_tokens"] = counter.get("prompt_tokens", 0)
@@ -176,6 +198,12 @@ def attach_events(runs: list[dict], events: list[dict]) -> None:
             round(counter["cache_hit_tokens"] / counter["prompt_tokens"], 3)
             if counter.get("prompt_tokens") else 0.0
         )
+        run["tool_exact"] = counter.get("tool_exact", 0)
+        run["tool_errors"] = counter.get("tool_errors", 0)
+        run["tool_blockers"] = dict(reasons.most_common())
+        run["tool_undetailed"] = counter.get("tool_undetailed", 0)
+        run["tool_followup_calls"] = counter.get("tool_followup_calls", 0)
+        run["tool_followup_prompt_tokens"] = counter.get("tool_followup_prompt_tokens", 0)
         run["outcome"] = outcome_of(run)
 
 
@@ -185,15 +213,15 @@ def render_markdown(runs: list[dict]) -> str:
         "",
         f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')} · 来源 `recordings/trajectories.sqlite3` · advisor 退出时自动更新（也可 `python tools/report_runs.py` 手动重建）",
         "",
-        "| # | 日期 | 角色 | 进阶 | 最高层 | 幕 | 结局 | 终局HP | 决策 | 模型调用 | 计划复用 | 确定性 | Prompt tokens | 命中率 |",
-        "|---|------|------|------|--------|----|------|--------|------|----------|----------|--------|---------------|--------|",
+        "| # | 日期 | 角色 | 进阶 | 最高层 | 幕 | 结局 | 终局HP | 决策 | 模型调用 | 工具有效/调用 | 计划复用 | 确定性 | Prompt tokens | 命中率 |",
+        "|---|------|------|------|--------|----|------|--------|------|----------|---------------|----------|--------|---------------|--------|",
     ]
     for index, run in enumerate(runs, 1):
         hp = f"{run['final_hp']}/{run['max_hp']}" if run["final_hp"] is not None else "-"
         lines.append(
             f"| {index} | {run['started_at'][:10]} | {run['character']} | {run['ascension']} "
             f"| {run['max_floor']} | {run['max_act'] or '-'} | {OUTCOME_LABEL[run['outcome']]} | {hp} "
-            f"| {run['decisions']} | {run['model_calls']} | {run['plan_reuses']} | {run['deterministic']} "
+            f"| {run['decisions']} | {run['model_calls']} | {run.get('tool_exact', 0)}/{run.get('tool_calls', 0)} | {run['plan_reuses']} | {run['deterministic']} "
             f"| {run['prompt_tokens']:,} | {run['cache_hit_rate']:.0%} |"
         )
     lines += ["", "## 按角色汇总", "",
@@ -210,6 +238,15 @@ def render_markdown(runs: list[dict]) -> str:
             f"| {sum(i['decisions'] for i in items) / len(items):.0f} "
             f"| {sum(i['prompt_tokens'] for i in items) / len(items):,.0f} |"
         )
+    lines += ["", "## 工具试算阻断原因", "", "原因按工具调用次数统计；一次调用可能包含多个原因。历史记录未保存具体原因时列为未记录。", ""]
+    for index, run in enumerate(runs, 1):
+        reasons = run.get("tool_blockers", {})
+        missing = run.get("tool_undetailed", 0)
+        if reasons or missing:
+            detail = "、".join(f"{name}: {count}" for name, count in reasons.items())
+            if missing:
+                detail += ("、" if detail else "") + f"未记录具体原因: {missing}"
+            lines.append(f"- 第 {index} 局：{detail}")
     total_tokens = sum(run["prompt_tokens"] for run in runs)
     lines += [
         "",

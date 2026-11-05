@@ -32,6 +32,28 @@ class DecisionToolTests(unittest.TestCase):
                            ("evaluate_combat_plan", self.args.replace("card:2", "card:999"))]:
             self.assertFalse(tool.call(name, args)["ok"])
 
+    def test_noncombat_relics_do_not_disable_forecast(self):
+        from dataclasses import replace
+        player = copy.deepcopy(self.ctx.player)
+        player.setdefault("relics", []).extend([
+            {"id": "STONE_HUMIDIFIER"}, {"id": "BOOK_OF_FIVE_RINGS"}])
+        ctx = replace(self.ctx, player=player)
+        self.assertTrue(DecisionTools(ctx).evaluate(["card:2"])['exact'])
+
+    def test_recorded_scroll_boxes_and_slippery(self):
+        rows = json.loads((Path(__file__).parent / "fixtures/function_calling_log_cases.json").read_text(encoding="utf-8"))
+        opening = build_decision_context(rows["opening"])
+        self.assertIsNotNone(opening)
+        self.assertIn("SCROLL_BOXES", [r["id"] for r in opening.player["relics"]])
+        attack = next(c for c in opening.candidates if c.action_type == "play_card")
+        self.assertTrue(DecisionTools(opening).evaluate([attack.candidate_id])["exact"])
+        inklets = build_decision_context(rows["slippery"])
+        self.assertIsNotNone(inklets)
+        first = next(c for c in inklets.candidates if c.action_type == "play_card" and c.params.get("card_index") == 0 and c.params.get("target") == "INKLET_0")
+        projection = DecisionTools(inklets).evaluate([first.candidate_id])
+        self.assertTrue(projection["exact"])
+        self.assertEqual(projection["projection"]["damage"], 1)
+
     def test_rage_counts_cards_and_not_hits_or_its_own_cast(self):
         from dataclasses import replace
         from sts2_advisor.contracts import Candidate
@@ -79,6 +101,17 @@ class DecisionToolTests(unittest.TestCase):
         self.assertEqual(messages[-2]["reasoning_content"], "tool reasoning")
         self.assertEqual(messages[-1]["tool_call_id"], "call-1")
         self.assertTrue(json.loads(messages[-1]["content"])["exact"])
+
+    def test_tool_result_overrules_false_kill_claim(self):
+        def create(**kwargs):
+            if len(kwargs["messages"]) == 2:
+                return self.response(tool=True)
+            return NS(choices=[NS(message=NS(content=json.dumps({
+                "candidate_id": "card:2", "reason": "此牌可击杀敌人", "confidence": 0.9,
+            })), finish_reason="stop")])
+        advice = self.backend(create).advise(self.ctx, [])
+        self.assertNotIn("可击杀", advice.reason)
+        self.assertLessEqual(advice.confidence, 0.4)
 
     def test_endless_tool_calls_are_bounded(self):
         requests = []

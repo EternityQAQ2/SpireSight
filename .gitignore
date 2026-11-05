@@ -56,7 +56,7 @@ secrets/
 
 # Downloaded base models and Hugging Face caches
 MiniCPM5_*/
-models/
+/models/
 .cache/
 hf_cache/
 huggingface/

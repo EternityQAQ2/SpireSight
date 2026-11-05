@@ -17,24 +17,41 @@ def _amount(entity: dict, ident: str) -> int:
     return sum(int(s.get("amount") or 0) for s in entity.get("status", []) if _status_id(s) == ident)
 
 
+PASSIVE_RELICS = {"BURNING_BLOOD", "NEOWS_TALISMAN", "SCROLL_BOXES", "STONE_HUMIDIFIER", "BOOK_OF_FIVE_RINGS"}
+SUPPORTED_RELICS = PASSIVE_RELICS | {"BOOMING_CONCH", "KUSARIGAMA", "LOST_COFFER", "GREMLIN_HORN", "PEN_NIB"}
+
+
+def unsupported_mechanics(context: DecisionContext) -> list[str]:
+    """Explain why a full turn projection cannot be trusted."""
+    battle = context.situation.get("battle") or {}
+    enemies = battle.get("enemies") or []
+    player = context.player
+    reasons = []
+    if not enemies or any(not e.get("entity_id") for e in enemies):
+        reasons.append("敌人信息不完整")
+    if player.get("orbs") or player.get("pets"):
+        reasons.append("充能球或宠物")
+    reasons.extend(f"玩家状态:{_status_id(s)}" for s in player.get("status", [])
+                   if _status_id(s) not in {"STRENGTH", "DEXTERITY", "RAGE"})
+    reasons.extend(f"敌人状态:{_status_id(s)}" for e in enemies for s in e.get("status", [])
+                   if _status_id(s) not in {"VULNERABLE", "ARTIFACT", "THORNS", "STRENGTH", "MINION", "SLIPPERY"})
+    reasons.extend(f"遗物:{r.get('id')}" for r in player.get("relics", []) if r.get("id") not in SUPPORTED_RELICS)
+    if any(r.get("id") == "KUSARIGAMA" for r in player.get("relics", [])) and len(enemies) > 1:
+        reasons.append("草薙镰随机目标")
+    for e in enemies:
+        for intent in e.get("intents", []):
+            if intent.get("type") == "Attack" and not re.search(r"造成\d+点伤害(?:\s*\d+\s*次)?", str(intent.get("description", ""))):
+                reasons.append(f"攻击意图:{e.get('entity_id')}")
+    return list(dict.fromkeys(reasons))
+
+
 def initial_state(context: DecisionContext) -> CombatState | None:
     """Only return a forecast state when all relevant active mechanics are covered."""
     battle = context.situation.get("battle") or {}
     enemies = deepcopy(battle.get("enemies") or [])
-    if not enemies or any(not e.get("entity_id") for e in enemies):
+    if unsupported_mechanics(context):
         return None
     player = context.player
-    if player.get("orbs") or player.get("pets"):
-        return None
-    if any(_status_id(s) not in {"STRENGTH", "DEXTERITY", "RAGE"} for s in player.get("status", [])):
-        return None
-    if any(_status_id(s) not in {"VULNERABLE", "ARTIFACT", "THORNS", "STRENGTH", "MINION"}
-           for e in enemies for s in e.get("status", [])):
-        return None
-    # Turn-start/end, card-play and damage-trigger relics require explicit support.
-    if any(r.get("id") not in {"BURNING_BLOOD", "BOOMING_CONCH", "KUSARIGAMA", "NEOWS_TALISMAN", "LOST_COFFER", "GREMLIN_HORN", "PEN_NIB"}
-           for r in player.get("relics", [])):
-        return None
     for e in enemies:
         for intent in e.get("intents", []):
             if intent.get("type") == "Attack" and not re.search(r"造成\d+点伤害", str(intent.get("description", ""))):
@@ -44,9 +61,6 @@ def initial_state(context: DecisionContext) -> CombatState | None:
         e["artifact"] = _amount(e, "ARTIFACT")
         e["incoming"] = enemy_incoming(e)[0]
     kusari = next((r for r in player.get("relics", []) if r.get("id") == "KUSARIGAMA"), None)
-    # Random relic damage is deterministic only with one surviving enemy.
-    if kusari and len(enemies) > 1:
-        return None
     return CombatState(
         hp=int(player.get("hp") or 0), block=int(player.get("block") or 0),
         energy=int(player.get("energy") or 0), strength=_amount(player, "STRENGTH"),
@@ -55,14 +69,19 @@ def initial_state(context: DecisionContext) -> CombatState | None:
         gremlin_horn=any(r.get("id") == "GREMLIN_HORN" for r in player.get("relics", [])), kusari=int(kusari.get("counter") or 0) if kusari else None,
         enemies=[EnemyState(entity_id=e["entity_id"], hp=e["hp"], block=e["block"],
                             vulnerable=e["vulnerable"], artifact=e["artifact"],
-                            incoming=e["incoming"], thorns=enemy_thorns(e), minion=bool(_amount(e, "MINION"))) for e in enemies],
+                            incoming=e["incoming"], thorns=enemy_thorns(e), minion=bool(_amount(e, "MINION")),
+                            slippery=_amount(e, "SLIPPERY")) for e in enemies],
     )
 
 
 def _damage(enemy: EnemyState, damage: int) -> None:
     absorbed = min(enemy.block, damage)
     enemy.block -= absorbed
-    enemy.hp = max(0, enemy.hp - damage + absorbed)
+    health_damage = damage - absorbed
+    if health_damage > 0 and enemy.slippery > 0:
+        health_damage = 1
+        enemy.slippery -= 1
+    enemy.hp = max(0, enemy.hp - health_damage)
 
 
 def play(state: CombatState, candidate: Candidate, card: dict) -> CombatState | None:
@@ -75,7 +94,7 @@ def play(state: CombatState, candidate: Candidate, card: dict) -> CombatState | 
     nxt.energy -= cost
     nxt.used.add(index)
     target = next((e for e in nxt.enemies if e.entity_id == candidate.params.get("target") and e.hp > 0), None)
-    if effect in {"strike", "bash", "taunt", "iron_wave", "body_slam", "setup_strike", "twin_strike", "pommel"} and target is None:
+    if effect in {"strike", "perfected_strike", "bash", "taunt", "iron_wave", "body_slam", "setup_strike", "twin_strike", "pommel"} and target is None:
         return None
     alive_before = sum(e.hp > 0 for e in nxt.enemies)
     if effect != "rage":

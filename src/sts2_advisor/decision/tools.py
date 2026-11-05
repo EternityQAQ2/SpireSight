@@ -6,7 +6,7 @@ import json
 
 from sts2_advisor.contracts import DecisionContext
 from sts2_advisor.decision.plan_check import check_plan
-from sts2_advisor.game.combat.simulation import initial_state, play, outcome
+from sts2_advisor.game.combat.simulation import initial_state, play, outcome, unsupported_mechanics
 
 
 TOOL_SCHEMAS = [{"type": "function", "function": {
@@ -51,6 +51,8 @@ class DecisionTools:
         state = initial_state(ctx)
         if check.error or state is None:
             result["limitation"] = check.error or "局面包含尚未支持的机制，未预测数值"
+            if state is None:
+                result["unsupported_mechanics"] = unsupported_mechanics(ctx)
             return result
         before = state
         candidates = {c.candidate_id: c for c in ctx.candidates}

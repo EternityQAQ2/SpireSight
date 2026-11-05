@@ -1,0 +1,551 @@
+{
+  "opening": {
+    "state_type": "monster",
+    "battle": {
+      "round": 1,
+      "turn": "player",
+      "is_play_phase": true,
+      "enemies": [
+        {
+          "entity_id": "TWIG_SLIME_S_0",
+          "combat_id": 1,
+          "name": "树枝史莱姆（小）",
+          "hp": 8,
+          "max_hp": 8,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "4",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成4点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "LEAF_SLIME_M_0",
+          "combat_id": 2,
+          "name": "树叶史莱姆（中）",
+          "hp": 33,
+          "max_hp": 33,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "StatusCard",
+              "label": "2",
+              "title": "策略",
+              "description": "这个敌人将会给你2张状态牌。"
+            }
+          ]
+        },
+        {
+          "entity_id": "LEAF_SLIME_S_0",
+          "combat_id": 3,
+          "name": "树叶史莱姆（小）",
+          "hp": 15,
+          "max_hp": 15,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "StatusCard",
+              "label": "1",
+              "title": "策略",
+              "description": "这个敌人将会给你1张状态牌。"
+            }
+          ]
+        }
+      ]
+    },
+    "run": {
+      "act": 1,
+      "floor": 2,
+      "ascension": 0
+    },
+    "player": {
+      "character": "铁甲战士",
+      "hp": 80,
+      "max_hp": 80,
+      "block": 0,
+      "energy": 3,
+      "max_energy": 3,
+      "hand": [
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 0,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 1,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "DEFEND_IRONCLAD",
+          "name": "防御",
+          "type": "Skill",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "格挡",
+              "description": "在下个回合前，阻挡伤害。"
+            }
+          ],
+          "index": 2,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "DEFEND_IRONCLAD",
+          "name": "防御",
+          "type": "Skill",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "格挡",
+              "description": "在下个回合前，阻挡伤害。"
+            }
+          ],
+          "index": 3,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "IRON_WAVE",
+          "name": "铁斩波",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。 造成5点伤害。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "格挡",
+              "description": "在下个回合前，阻挡伤害。"
+            }
+          ],
+          "index": 4,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        }
+      ],
+      "draw_pile_count": 8,
+      "discard_pile_count": 0,
+      "exhaust_pile_count": 0,
+      "draw_pile": [
+        {
+          "name": "痛击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成8点伤害。 给予2层易伤。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "完美打击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成6点伤害。 你每有一张名字中含有“打击”的牌，伤害+2。"
+        },
+        {
+          "name": "重锤",
+          "cost": "3",
+          "star_cost": null,
+          "description": "造成32点伤害。"
+        }
+      ],
+      "discard_pile": [],
+      "exhaust_pile": [],
+      "gold": 99,
+      "status": [],
+      "relics": [
+        {
+          "id": "BURNING_BLOOD",
+          "name": "燃烧之血",
+          "description": "在战斗结束时，回复6点生命。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "SCROLL_BOXES",
+          "name": "卷轴箱",
+          "description": "拾起时，从2个卡牌包中选择1包加入你的牌组。",
+          "counter": null,
+          "keywords": []
+        }
+      ],
+      "potions": [],
+      "max_potion_slots": 3
+    }
+  },
+  "slippery": {
+    "state_type": "monster",
+    "battle": {
+      "round": 1,
+      "turn": "player",
+      "is_play_phase": true,
+      "enemies": [
+        {
+          "entity_id": "INKLET_0",
+          "combat_id": 1,
+          "name": "墨宝",
+          "hp": 14,
+          "max_hp": 14,
+          "block": 0,
+          "status": [
+            {
+              "id": "SLIPPERY_POWER",
+              "name": "滑溜",
+              "amount": 1,
+              "type": "Buff",
+              "description": "墨宝下1次要失去生命值时，只会失去1点生命。",
+              "keywords": []
+            }
+          ],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "3",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成3点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "INKLET_1",
+          "combat_id": 2,
+          "name": "墨宝",
+          "hp": 16,
+          "max_hp": 16,
+          "block": 0,
+          "status": [
+            {
+              "id": "SLIPPERY_POWER",
+              "name": "滑溜",
+              "amount": 1,
+              "type": "Buff",
+              "description": "墨宝下1次要失去生命值时，只会失去1点生命。",
+              "keywords": []
+            }
+          ],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "2×3",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成2点伤害3次。"
+            }
+          ]
+        },
+        {
+          "entity_id": "INKLET_2",
+          "combat_id": 3,
+          "name": "墨宝",
+          "hp": 15,
+          "max_hp": 15,
+          "block": 0,
+          "status": [
+            {
+              "id": "SLIPPERY_POWER",
+              "name": "滑溜",
+              "amount": 1,
+              "type": "Buff",
+              "description": "墨宝下1次要失去生命值时，只会失去1点生命。",
+              "keywords": []
+            }
+          ],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "3",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成3点伤害。"
+            }
+          ]
+        }
+      ]
+    },
+    "run": {
+      "act": 1,
+      "floor": 9,
+      "ascension": 0
+    },
+    "player": {
+      "character": "铁甲战士",
+      "hp": 16,
+      "max_hp": 80,
+      "block": 0,
+      "energy": 3,
+      "max_energy": 3,
+      "hand": [
+        {
+          "id": "PERFECTED_STRIKE",
+          "name": "完美打击",
+          "type": "Attack",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成18点伤害。 你每有一张名字中含有“打击”的牌，伤害+2。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 0,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 1,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "DEFEND_IRONCLAD",
+          "name": "防御",
+          "type": "Skill",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "格挡",
+              "description": "在下个回合前，阻挡伤害。"
+            }
+          ],
+          "index": 2,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "VICIOUS",
+          "name": "凶恶",
+          "type": "Power",
+          "cost": "1",
+          "star_cost": null,
+          "description": "每当你给予易伤时，抽1张牌。",
+          "rarity": "Uncommon",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "易伤",
+              "description": "易伤的生物从攻击中受到的伤害增加50%。"
+            }
+          ],
+          "index": 3,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "CRUELTY",
+          "name": "残酷",
+          "type": "Power",
+          "cost": "1",
+          "star_cost": null,
+          "description": "有易伤状态的敌人额外受到25%的伤害。",
+          "rarity": "Uncommon",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "易伤",
+              "description": "易伤的生物从攻击中受到的伤害增加50%。"
+            }
+          ],
+          "index": 4,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        }
+      ],
+      "draw_pile_count": 13,
+      "discard_pile_count": 0,
+      "exhaust_pile_count": 0,
+      "draw_pile": [
+        {
+          "name": "痛击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成8点伤害。 给予2层易伤。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "铁斩波",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。 造成5点伤害。"
+        },
+        {
+          "name": "耸肩无视",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得8点格挡。 抽1张牌。"
+        },
+        {
+          "name": "双重打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成5点伤害两次。"
+        },
+        {
+          "name": "重锤",
+          "cost": "3",
+          "star_cost": null,
+          "description": "造成32点伤害。"
+        },
+        {
+          "name": "燃烧",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得2点力量。"
+        },
+        {
+          "name": "主宰",
+          "cost": "1",
+          "star_cost": null,
+          "description": "给予1层易伤。 敌人身上每有一层易伤，就获得1点力量。 消耗。"
+        }
+      ],
+      "discard_pile": [],
+      "exhaust_pile": [],
+      "gold": 59,
+      "status": [],
+      "relics": [
+        {
+          "id": "BURNING_BLOOD",
+          "name": "燃烧之血",
+          "description": "在战斗结束时，回复6点生命。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "SCROLL_BOXES",
+          "name": "卷轴箱",
+          "description": "拾起时，从2个卡牌包中选择1包加入你的牌组。",
+          "counter": null,
+          "keywords": []
+        }
+      ],
+      "potions": [
+        {
+          "id": "SWIFT_POTION",
+          "name": "迅捷药水",
+          "description": "抽3张牌。",
+          "slot": 0,
+          "can_use_in_combat": true,
+          "target_type": "AnyPlayer",
+          "keywords": []
+        }
+      ],
+      "max_potion_slots": 3
+    }
+  }
+}

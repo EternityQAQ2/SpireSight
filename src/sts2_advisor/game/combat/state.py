@@ -14,6 +14,7 @@ class EnemyState:
     incoming: int
     thorns: int
     minion: bool = False
+    slippery: int = 0
 
 
 @dataclass(slots=True)

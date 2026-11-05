@@ -21,6 +21,7 @@ def known_effect(card: dict) -> str | None:
     text = re.sub(r"\s+", "", str(card.get("description", "")))
     patterns = {
         "strike": r"造成\d+点伤害。",
+        "perfected_strike": r"造成\d+点伤害。你每有一张名字中含有“打击”的牌，伤害\+2。",
         "defend": r"获得\d+点格挡。",
         "bash": r"造成\d+点伤害。给予\d+层易伤。",
         "taunt": r"获得\d+点格挡。给予\d+层易伤。",
@@ -38,6 +39,7 @@ def known_effect(card: dict) -> str | None:
               "defend" if ident.startswith("DEFEND_") else
               {"BASH": "bash", "TAUNT": "taunt", "IRON_WAVE": "iron_wave",
                "BODY_SLAM": "body_slam", "INFLAME": "inflame", "BLUDGEON": "strike",
+               "PERFECTED_STRIKE": "perfected_strike",
                "SETUP_STRIKE": "setup_strike", "TWIN_STRIKE": "twin_strike",
                "RAGE": "rage", "SHRUG_IT_OFF": "shrug", "POMMEL_STRIKE": "pommel"}.get(ident))
     if effect and re.fullmatch(patterns[effect], text):
