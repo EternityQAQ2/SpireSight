@@ -133,6 +133,16 @@ OPENAI_THINKING=disabled
 
 远程后端使用官方 `openai` Python 库，也支持兼容 OpenAI Chat Completions 的服务。进程环境变量优先于 `.env`；`.env` 已被 Git 忽略。DeepSeek 默认使用 JSON Output 并关闭思考模式，避免为短决策生成冗长思维链；需要重新启用时设置 `OPENAI_THINKING=enabled`。
 
+使用 OpenCode Go 套餐时设置 `OPENCODE_MODE=true`，并把 `OPENAI_BASE_URL` 指向 Go 入口：
+
+```dotenv
+OPENAI_BASE_URL=https://opencode.ai/inference/go/openai/v1
+OPENAI_MODEL=kimi-k3
+OPENCODE_MODE=true
+```
+
+开启后客户端会发送 Go 要求的 `User-Agent`（标识为 `spiresight-advisor/0.1`）和每个进程稳定复用的 `x-opencode-session`，避免被当作匿名 SDK 流量。该模式面向编码类流量设计，长时间非编码调用可能受用量或滥用策略限制。
+
 运行日志写入 `logs/advisor-*.log`，包含远程 API 原始响应 JSON 以及抽取后的 `content`/`reasoning` 文本，启动时自动删除超过 3 天的日志。日志不记录 API 密钥，但可能包含游戏局面与模型回答，不应公开上传。可用 `--log-retention-days` 和 `--log-dir` 调整。
 
 模型会为战斗、商店和奖励列表生成短计划：支持的战斗效果允许连续多步，通常以 `combat:end_turn` 收尾。后续状态若符合预期，程序重新核验剩余计划后复用；费用、效果和目标变化必须通过当前状态校验，抽牌、生成手牌、未支持效果、商品不可购买或界面跳转等情况会触发重新决策。
@@ -142,6 +152,16 @@ OPENAI_THINKING=disabled
 本局牌组另存于 `player.deck_snapshot`：首次观测一场战斗时合并手牌、抽牌堆、弃牌堆和消耗堆，按名称、升级状态和数量汇总，跨界面提供给选牌、商店、事件、地图和休息点。已打出的能力牌不会因离开这些区域而被误删，后续新增的战斗牌另列；自动执行成功并观测到界面变化后，跟踪拿牌、购买及可识别的单张升级/移除，下场战斗重新校正。当前模组没有常驻完整牌组字段，因此历史快照会注明来源、可能过期和未跟踪变化，不能当成权威永久持牌清单。数据库中的全卡牌资料仍用于效果知识检索。
 
 战斗计算器对支持的确定性效果枚举当前回合可行顺序，提供输出、格挡、剩余能量和预计掉血。模型计划与缓存复用都会经过逐步费用、手牌和目标检查；未支持的效果需要执行后重新读取状态。试算只是当前回合的启发式参考，不是完整游戏模拟。选牌输出还必须说明本局缺口、当前拿牌收益及与跳过的比较。模块边界和支持范围见 [架构说明](docs/arch.md)，固定日志回归见 [离线评估](evals/README.md)。
+
+## 开发者模式
+
+调试提示词或排查链路时添加 `--dev`。它按决策阶段输出环境、原始局面、检索证据、完整提示词、模型 reasoning 与输出、校验/修复结果、最终动作，并统计输入/输出/缓存命中的 token 消耗：
+
+```bash
+.venv/bin/python main.py --watch --backend openai --dev
+```
+
+详情写入 `logs/dev/dev-时间戳.log`，同时打印到终端；`--dev-quiet` 只写文件，`--dev-dir` 更换目录。开发者模式独立于轨迹记录，可与 `--no-record` 同时使用。完整说明见 [开发者模式](docs/developer-mode.md)。
 
 ## 原始轨迹记录
 

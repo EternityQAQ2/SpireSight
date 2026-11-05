@@ -12,6 +12,7 @@ from sts2_advisor.contracts import (
     Sts2ApiError, AdvisorBackend, Retriever,
 )
 from sts2_advisor.decision.policy import repair_plan_if_current_action_is_legal
+from sts2_advisor.developer import dev_section, dev_step, evidence_blocks
 from sts2_advisor.decision.survival import avoid_proven_death
 from sts2_advisor.recording.logging import get_logger
 from sts2_advisor.game.state import StateBuilder
@@ -66,6 +67,7 @@ class AdvisorService:
                 raw_state = self.client.get_singleplayer_state()
             except Sts2ApiError as exc:
                 record_event("environment.error", message=str(exc), after_step_id=self._previous_step_id)
+                dev_section("环境错误", type(exc).__name__, fields={"message": str(exc)})
                 raise
             # 轮询间隔内游戏状态经常完全不变（实测约六成观察是逐字节重复），
             # 重复样本对训练与统计都是噪音：只记录内容变化后的首条。
@@ -134,7 +136,13 @@ class AdvisorService:
 
     def _process(self, raw_state: dict, context) -> Advice:
         scope = self.trajectory.step(raw_state, context) if self.trajectory else nullcontext(None)
-        with scope as step_id:
+        with scope as step_id, dev_step(
+            context.decision_id,
+            state_type=context.state_type,
+            decision_type=context.decision_type,
+            raw_state=raw_state,
+            context=context.to_dict(),
+        ):
             self._current_step_id = step_id
             self._previous_step_id = step_id
             return self._process_step(raw_state, context)
@@ -151,11 +159,19 @@ class AdvisorService:
                     "plan_cache_hit decision_id=%s remaining_steps=%s",
                     context.decision_id, len(advice.plan_candidate_ids),
                 )
+                dev_section("计划复用", "短计划命中，本次未请求模型", fields={
+                    "origin_step_id": self._plan_origin_step_id,
+                    "remaining_steps": len(advice.plan_candidate_ids),
+                    "advice": advice.to_dict(),
+                })
                 self.output("复用上一轮短计划，本次未请求模型。")
                 return self._deliver(
                     raw_state, context, evidence, advice, "plan-cache"
                 )
             logger.info("plan_cache_invalidated decision_id=%s", context.decision_id)
+            dev_section("计划复用", "短计划失效，重新决策", fields={
+                "origin_step_id": self._plan_origin_step_id,
+            })
             self.active_plan = None
             record_event("plan.invalidated", origin_step_id=self._plan_origin_step_id)
             self._plan_origin_step_id = None
@@ -172,6 +188,9 @@ class AdvisorService:
                 "deterministic_advice decision_id=%s candidate_id=%s",
                 context.decision_id, deterministic.candidate_id,
             )
+            dev_section("确定性决策", "仅有一个合法动作，未请求检索或模型", fields={
+                "advice": deterministic.to_dict(),
+            })
             self.output("当前仅有一个合法动作，本次未请求检索或模型。")
             return self._deliver(raw_state, context, [], deterministic, "deterministic")
 
@@ -180,10 +199,22 @@ class AdvisorService:
                      retriever=type(self.retriever).__name__)
         evidence = self.retriever.retrieve(context, retrieval_top_k)
         record_event("retrieval.result", evidence=[item.to_dict() for item in evidence])
+        dev_section(
+            "检索", f"命中 {len(evidence)} 条证据",
+            blocks=evidence_blocks([item.to_dict() for item in evidence]),
+            fields={
+                "top_k": retrieval_top_k,
+                "retriever": type(self.retriever).__name__,
+            },
+        )
         backend_name = self.backend_name
         try:
             proposed = self.backend.advise(context, evidence)
             record_event("decision.proposal", backend=backend_name, advice=proposed.to_dict())
+            dev_section("建议生成", f"{backend_name} 原始建议", fields={
+                "backend": backend_name,
+                "advice": proposed.to_dict(),
+            })
             proposed, repair_reason = repair_plan_if_current_action_is_legal(proposed, context)
             if repair_reason is not None:
                 record_event(
@@ -195,9 +226,16 @@ class AdvisorService:
                     "plan_repaired decision_id=%s candidate_id=%s reason=%s",
                     context.decision_id, proposed.candidate_id, repair_reason,
                 )
+                dev_section("计划修复", "保留当前合法动作", fields={
+                    "reason": repair_reason,
+                    "candidate_id": proposed.candidate_id,
+                    "plan_candidate_ids": proposed.plan_candidate_ids,
+                    "warnings": proposed.warnings,
+                })
             advice = validate_advice(proposed, context, evidence)
         except (AdviceValidationError, ValueError, RuntimeError) as exc:
             record_event("decision.validation_error", error_type=type(exc).__name__, message=str(exc))
+            dev_section("校验失败", type(exc).__name__, fields={"message": str(exc)})
             logger.exception(
                 "advisor_fallback backend=%s decision_id=%s error_type=%s",
                 self.backend_name, context.decision_id, type(exc).__name__,
@@ -209,6 +247,10 @@ class AdvisorService:
                          error_type=type(exc).__name__, message=str(exc))
             self.output(f"模型输出不可用，改用规则后端：{exc}")
             advice = validate_advice(self.fallback_backend.advise(context, evidence), context, evidence)
+            dev_section("建议生成", "规则后端回退建议", fields={
+                "backend": backend_name,
+                "advice": advice.to_dict(),
+            })
         self.active_plan = ActivePlan.from_advice(advice, context, evidence)
         if self.active_plan is not None:
             self._plan_origin_step_id = self._current_step_id
@@ -223,6 +265,10 @@ class AdvisorService:
             advice = guarded
         rendered = render_console(advice, context, evidence)
         record_event("decision.output", backend=backend_name, advice=advice.to_dict(), rendered=rendered)
+        dev_section("最终建议", "交付结果", blocks={"console": rendered}, fields={
+            "backend": backend_name,
+            "action_mode": "auto-act" if self.action_executor else "read-only",
+        })
         self.output("\n" + rendered + "\n")
         self._record_safely(raw_state, context, evidence, advice, backend_name)
         if self.action_executor:

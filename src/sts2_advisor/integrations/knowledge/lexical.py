@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
+from sts2_advisor.developer import dev_section
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.common import parse_evidence_lines, tokenize, metadata_matches
 
@@ -26,6 +27,14 @@ class JsonKnowledgeRetriever:
         record_event("retrieval.query", provider="json", path=str(self.path), top_k=top_k,
                      query_terms=sorted(query_terms), decision_type=context.decision_type,
                      character=context.player.get("character"))
+        dev_section("检索查询", "json 词项匹配", fields={
+            "path": str(self.path),
+            "top_k": top_k,
+            "decision_type": context.decision_type,
+            "character": context.player.get("character"),
+            "query_terms": sorted(query_terms),
+            "record_count": len(self.records),
+        })
         scored: list[tuple[float, Evidence]] = []
         for evidence in self.records:
             if not metadata_matches(evidence.metadata, context):
@@ -37,4 +46,11 @@ class JsonKnowledgeRetriever:
         scored.sort(key=lambda pair: pair[0], reverse=True)
         record_event("retrieval.ranked", provider="json", score_kind="lexical_overlap",
                      hits=[{"score": score, "evidence": evidence.to_dict()} for score, evidence in scored[:top_k]])
+        dev_section("检索排序", "json 词项得分", fields={
+            "score_kind": "lexical_overlap",
+            "hits": [
+                {"evidence_id": evidence.evidence_id, "score": round(score, 4)}
+                for score, evidence in scored[:top_k]
+            ],
+        })
         return [evidence for _, evidence in scored[:top_k]]

@@ -6,6 +6,12 @@ import os
 import sys
 from pathlib import Path
 
+from sts2_advisor.developer import (
+    DeveloperTrace,
+    activate,
+    deactivate,
+    runtime_environment,
+)
 from sts2_advisor.integrations.sts2.client import Sts2ApiError, Sts2RestClient
 from sts2_advisor.recording.logging import configure_logging, get_logger
 from sts2_advisor.integrations.models.remote import OpenAIAdvisor
@@ -51,6 +57,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--recording-dir", type=Path, default=PROJECT_ROOT / "recordings")
     parser.add_argument("--log-dir", type=Path, default=PROJECT_ROOT / "logs")
     parser.add_argument("--log-retention-days", type=int, default=3)
+    parser.add_argument(
+        "--dev", action="store_true",
+        help="开发者模式：逐步输出环境、证据、完整提示词、模型输出并统计 token",
+    )
+    parser.add_argument(
+        "--dev-dir", type=Path, default=PROJECT_ROOT / "logs/dev",
+        help="开发者模式日志目录；默认 logs/dev",
+    )
+    parser.add_argument(
+        "--dev-quiet", action="store_true",
+        help="开发者模式只写日志文件，不打印到终端",
+    )
     parser.add_argument("--dump-context", action="store_true", help="打印压缩后的决策上下文并退出")
     return parser
 
@@ -142,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"运行日志：{log_path}")
 
     retriever = create_retriever(args.rag, args.chroma_path, args.knowledge_file)
+    backend_info: dict[str, object] = {}
     if args.backend == "transformers":
         try:
             backend = TransformersAdvisor(
@@ -151,6 +170,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"模型加载失败：{exc}", file=sys.stderr)
             return 1
         fallback = RuleAdvisor()
+        backend_info = {
+            "模型": backend.model_name,
+            "推理设备": backend.device,
+            "最大新token": backend.max_new_tokens,
+            "模型缓存": str(args.model_cache),
+        }
         print(f"模型推理设备：{backend.device}")
     elif args.backend == "openai":
         load_environment(PROJECT_ROOT / ".env")
@@ -165,20 +190,34 @@ def main(argv: list[str] | None = None) -> int:
                 thinking = "disabled"
             if thinking not in {None, "enabled", "disabled"}:
                 raise ValueError("OPENAI_THINKING 必须为 enabled 或 disabled")
+            json_mode = environment_flag("OPENAI_JSON_MODE", True)
+            function_calling = environment_flag("OPENAI_FUNCTION_CALLING", True)
+            opencode_mode = environment_flag("OPENCODE_MODE", False)
             backend = OpenAIAdvisor(
                 remote_model,
                 api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
                 base_url=base_url,
                 timeout=args.remote_timeout,
                 max_tokens=remote_max_tokens,
-                json_mode=environment_flag("OPENAI_JSON_MODE", True),
+                json_mode=json_mode,
                 thinking=thinking,
-                function_calling=environment_flag("OPENAI_FUNCTION_CALLING", True),
+                function_calling=function_calling,
+                opencode_mode=opencode_mode,
             )
         except Exception as exc:
             print(f"远程模型配置失败：{exc}", file=sys.stderr)
             return 1
         fallback = RuleAdvisor()
+        backend_info = {
+            "模型": remote_model,
+            "接口地址": base_url or "OpenAI 默认",
+            "最大输出token": remote_max_tokens,
+            "请求超时秒": args.remote_timeout,
+            "JSON模式": json_mode,
+            "思考模式": thinking or "服务默认",
+            "函数调用": function_calling,
+            "OpenCode模式": opencode_mode,
+        }
         print(
             f"远程模型：{remote_model}（最大输出 {remote_max_tokens} tokens，"
             f"思考模式 {thinking or '服务默认'}）"
@@ -186,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         backend = RuleAdvisor()
         fallback = None
+        backend_info = {"模型": "规则后端（不代表高水平策略）"}
     logger.info("backend_ready backend=%s log_path=%s", args.backend, log_path)
 
     recorder = SessionRecorder(
@@ -204,6 +244,27 @@ def main(argv: list[str] | None = None) -> int:
         action_executor=executor,
         state_builder=state_builder,
     )
+    dev_trace: DeveloperTrace | None = None
+    dev_token = None
+    if args.dev:
+        dev_trace = DeveloperTrace(args.dev_dir, echo=not args.dev_quiet)
+        dev_trace.start(runtime_environment(
+            游戏接口=args.base_url,
+            游戏超时秒=args.timeout,
+            后端=args.backend,
+            **backend_info,
+            RAG=args.rag,
+            top_k=args.top_k,
+            自动执行=args.auto_act,
+            持续监听=args.watch,
+            轮询间隔秒=args.poll_interval,
+            稳定读数=args.stable_reads,
+            运行日志=str(log_path),
+            轨迹记录="关闭" if args.no_record else str(args.recording_dir),
+        ))
+        dev_token = activate(dev_trace)
+        if not args.dev_quiet:
+            print(f"开发者模式日志：{dev_trace.path}")
     session_status = "completed"
     try:
         if args.watch:
@@ -224,6 +285,12 @@ def main(argv: list[str] | None = None) -> int:
         raise
     finally:
         recorder.close(session_status)
+        if dev_trace is not None:
+            try:
+                dev_trace.finish(session_status)
+            finally:
+                if dev_token is not None:
+                    deactivate(dev_token)
         if not args.no_record:
             # 会话轨迹已落库，退出时顺手刷新战绩报表；失败不阻断退出。
             try:
