@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from .domain import Advice, DecisionContext, Evidence
+from sts2_advisor.contracts import Advice, DecisionContext, Evidence
+from sts2_advisor.decision.plan_check import check_plan
 
 
 class AdviceValidationError(ValueError):
@@ -36,7 +37,7 @@ def validate_advice(
     if len(reason) > 240:
         reason = reason[:237] + "..."
 
-    plan_candidate_ids = list(dict.fromkeys(advice.plan_candidate_ids))
+    plan_candidate_ids = list(advice.plan_candidate_ids)
     if not plan_candidate_ids:
         plan_candidate_ids = [advice.candidate_id]
     elif plan_candidate_ids[0] != advice.candidate_id:
@@ -44,6 +45,17 @@ def validate_advice(
     invalid_plan = set(plan_candidate_ids) - candidate_ids
     if invalid_plan:
         raise AdviceValidationError(f"模型计划包含非法候选: {sorted(invalid_plan)}")
+    checked = check_plan(context, plan_candidate_ids)
+    if checked.error:
+        raise AdviceValidationError(checked.error)
+    plan_candidate_ids = checked.candidate_ids
+    selection = advice.selection_analysis
+    if not isinstance(selection, dict):
+        raise AdviceValidationError("selection_analysis 必须为对象")
+    if context.decision_type == "card_reward":
+        if any(not isinstance(selection.get(k), str) or not selection[k].strip()
+               for k in ("gap", "contribution", "skip_comparison")):
+            raise AdviceValidationError("选牌必须说明当前缺口、拿牌收益及与跳过的比较")
 
     candidate_labels = {
         candidate.candidate_id: candidate.label for candidate in context.candidates
@@ -63,6 +75,8 @@ def validate_advice(
             break
 
     warnings = list(dict.fromkeys(advice.warnings))
+    if checked.boundary:
+        warnings.insert(0, checked.boundary)
     if dropped_alternatives:
         warning = "模型返回了非法备选，已忽略：" + ",".join(sorted(dropped_alternatives))
         warnings = [warning] + warnings
@@ -75,5 +89,6 @@ def validate_advice(
         evidence_ids=list(dict.fromkeys(advice.evidence_ids))[:6],
         warnings=warnings[:4],
         plan_candidate_ids=plan_candidate_ids[:8],
+        selection_analysis={k: str(v)[:240] for k, v in selection.items()
+                            if k in {"gap", "contribution", "skip_comparison"}},
     )
-

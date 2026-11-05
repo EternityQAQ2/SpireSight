@@ -84,14 +84,14 @@ class CliIntegrationTests(unittest.TestCase):
 
     def test_malformed_api_response_exits_cleanly(self):
         with game_api(b"not json") as (url, _, _):
-            result = self.run_cli(url, "--no-record")
+            result = self.run_cli(url, "--no-record", "--rag", "none")
         self.assertEqual(result.returncode, 1)
         self.assertIn("无效 JSON", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_api_conflict_exits_cleanly(self):
         with game_api(b'{"error":"multiplayer active"}', status=409) as (url, _, _):
-            result = self.run_cli(url, "--no-record")
+            result = self.run_cli(url, "--no-record", "--rag", "none")
         self.assertEqual(result.returncode, 1)
         self.assertIn("HTTP 409", result.stderr)
 

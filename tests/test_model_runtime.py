@@ -10,10 +10,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sts2_advisor.model import RuleAdvisor, TransformersAdvisor
-from sts2_advisor.recording import SessionRecorder
-from sts2_advisor.retrieval import NullRetriever
-from sts2_advisor.service import AdvisorService
+from sts2_advisor.integrations.models.rules import RuleAdvisor
+from sts2_advisor.integrations.models.local import TransformersAdvisor
+from sts2_advisor.recording.session import SessionRecorder
+from sts2_advisor.integrations.knowledge.lexical import NullRetriever
+from sts2_advisor.application.advisor import AdvisorService
 
 
 HAS_MODEL = all(importlib.util.find_spec(name) is not None for name in ("torch", "transformers"))

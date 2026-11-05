@@ -13,13 +13,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from sts2_advisor.api import Sts2ApiError
-from sts2_advisor.domain import Advice
-from sts2_advisor.model import OpenAIAdvisor, RuleAdvisor
-from sts2_advisor.record import trace_scope
-from sts2_advisor.recording import SessionRecorder
-from sts2_advisor.retrieval import JsonKnowledgeRetriever, NullRetriever
-from sts2_advisor.service import AdvisorService
+from sts2_advisor.integrations.sts2.client import Sts2ApiError
+from sts2_advisor.contracts import Advice
+from sts2_advisor.integrations.models.remote import OpenAIAdvisor
+from sts2_advisor.integrations.models.rules import RuleAdvisor
+from sts2_advisor.recording.trajectory import trace_scope
+from sts2_advisor.recording.session import SessionRecorder
+from sts2_advisor.integrations.knowledge.lexical import JsonKnowledgeRetriever, NullRetriever
+from sts2_advisor.application.advisor import AdvisorService
+from sts2_advisor.game.state import StateBuilder
+from sts2_advisor.integrations.sts2.actions import ActionExecutor
 from test_actions import COMBAT, action_api
 from test_cli_integration import game_api
 import test_cli_integration as cli_tests
@@ -38,9 +41,13 @@ def read_events(directory):
 class TrajectoryTests(unittest.TestCase):
     def service(self, directory, client, backend=None, **kwargs):
         recorder = SessionRecorder(Path(directory))
+        builder = StateBuilder()
+        auto_act = kwargs.pop("auto_act", False)
         service = AdvisorService(
             client, NullRetriever(), backend or RuleAdvisor(), recorder,
-            backend_name="test", output=lambda _: None, **kwargs,
+            backend_name="test", output=lambda _: None, state_builder=builder,
+            action_executor=ActionExecutor(client, context_builder=builder, output=lambda _: None) if auto_act else None,
+            **kwargs,
         )
         return service, recorder
 
@@ -88,7 +95,7 @@ class TrajectoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with action_api() as (client, requests):
                 service, recorder = self.service(directory, client, auto_act=True)
-                with patch("sts2_advisor.action.urlopen", side_effect=RemoteDisconnected("lost")):
+                with patch("sts2_advisor.integrations.sts2.actions.urlopen", side_effect=RemoteDisconnected("lost")):
                     with self.assertRaises(Sts2ApiError):
                         service.run_once()
                 self.assertFalse(service.run_once())
@@ -179,7 +186,7 @@ class TrajectoryTests(unittest.TestCase):
                 recorder.close()
 
     def test_malformed_environment_response_is_preserved_even_without_a_step(self):
-        from sts2_advisor.api import Sts2RestClient
+        from sts2_advisor.integrations.sts2.client import Sts2RestClient
         with tempfile.TemporaryDirectory() as directory:
             with game_api(b"not json") as (url, _, _):
                 service, recorder = self.service(directory, Sts2RestClient(url))
@@ -219,7 +226,7 @@ class TrajectoryTests(unittest.TestCase):
                 recorder.close()
 
     def test_export_roundtrips_raw_events_and_keeps_sessions_separate(self):
-        from sts2_advisor.record import export_session, iter_events, record_event, main
+        from sts2_advisor.recording.trajectory import export_session, iter_events, record_event, main
         with tempfile.TemporaryDirectory() as directory:
             with action_api() as (client, _):
                 first, recorder = self.service(directory, client)
@@ -349,14 +356,14 @@ class ObservationDedupTests(unittest.TestCase):
             def __exit__(self, *_args):
                 return False
 
-        from sts2_advisor.api import Sts2RestClient
+        from sts2_advisor.integrations.sts2.client import Sts2RestClient
 
         with tempfile.TemporaryDirectory() as directory:
             recorder = SessionRecorder(Path(directory))
             try:
                 bodies = [b'{"state_type": "map"}', b'{"state_type": "map"}', b'{"state_type": "event"}']
                 client = Sts2RestClient("http://example.test")
-                with patch("sts2_advisor.api.urlopen",
+                with patch("sts2_advisor.integrations.sts2.client.urlopen",
                            side_effect=[FakeResponse(body) for body in bodies]),                         trace_scope(recorder.trajectory):
                     client._get_json("/api/v1/singleplayer")
                     client._get_json("/api/v1/singleplayer")

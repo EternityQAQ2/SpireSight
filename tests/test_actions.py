@@ -12,15 +12,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
-from sts2_advisor.action import ActionExecutor, action
-from sts2_advisor.api import Sts2ApiError, Sts2RestClient
-from sts2_advisor.domain import Advice
-from sts2_advisor.model import RuleAdvisor
-from sts2_advisor.recording import SessionRecorder
-from sts2_advisor.retrieval import NullRetriever
-from sts2_advisor.service import AdvisorService
-from sts2_advisor.normalize import build_decision_context
-from sts2_advisor.validation import AdviceValidationError
+from sts2_advisor.integrations.sts2.actions import ActionExecutor, action
+from sts2_advisor.integrations.sts2.client import Sts2ApiError, Sts2RestClient
+from sts2_advisor.contracts import Advice
+from sts2_advisor.integrations.models.rules import RuleAdvisor
+from sts2_advisor.recording.session import SessionRecorder
+from sts2_advisor.integrations.knowledge.lexical import NullRetriever
+from sts2_advisor.application.advisor import AdvisorService
+from sts2_advisor.game.state import build_decision_context
+from sts2_advisor.game.state import StateBuilder
+from sts2_advisor.decision.validation import AdviceValidationError
 
 
 FIXTURE = Path(__file__).parent / "fixtures/combat_state.json"
@@ -107,7 +108,7 @@ class ActionApiTests(unittest.TestCase):
             self.assertEqual(requests, [])
 
     def test_disconnected_post_is_reported_without_retry(self):
-        with patch("sts2_advisor.action.urlopen", side_effect=RemoteDisconnected("response lost")) as send:
+        with patch("sts2_advisor.integrations.sts2.actions.urlopen", side_effect=RemoteDisconnected("response lost")) as send:
             with self.assertRaisesRegex(Sts2ApiError, "response lost"):
                 action("end_turn")
             self.assertEqual(send.call_count, 1)
@@ -183,7 +184,7 @@ class ActionExecutorTests(unittest.TestCase):
         assert context is not None
         advice = Advice(context.decision_id, "reward:proceed", "test", 1.0)
         with action_api(states=[raw]) as (client, requests), \
-                patch("sts2_advisor.action.urlopen", side_effect=RemoteDisconnected("response lost")):
+                patch("sts2_advisor.integrations.sts2.actions.urlopen", side_effect=RemoteDisconnected("response lost")):
             executor = ActionExecutor(client, output=lambda text: None)
             with self.assertRaisesRegex(Sts2ApiError, "response lost"):
                 executor.execute(advice, context)
@@ -193,9 +194,12 @@ class ActionExecutorTests(unittest.TestCase):
 
 class AutomaticActionTests(unittest.TestCase):
     def service(self, client, *, auto_act=True):
+        builder = StateBuilder()
         return AdvisorService(
             client, NullRetriever(), RuleAdvisor(), SessionRecorder(Path("unused"), enabled=False),
-            backend_name="rule", auto_act=auto_act, output=lambda text: None,
+            backend_name="rule", state_builder=builder,
+            action_executor=ActionExecutor(client, context_builder=builder, output=lambda _: None) if auto_act else None,
+            output=lambda text: None,
         )
 
     def test_executes_recommended_candidate_once_and_waits_for_state_change(self):
@@ -229,7 +233,7 @@ class AutomaticActionTests(unittest.TestCase):
         states = [COMBAT, COMBAT, COMBAT, MAP, MAP, MAP, {"state_type": "menu"}]
         with action_api(states) as (client, requests):
             service = self.service(client)
-            with patch("sts2_advisor.service.time.sleep", side_effect=[None] * 7 + [KeyboardInterrupt]):
+            with patch("sts2_advisor.application.advisor.time.sleep", side_effect=[None] * 7 + [KeyboardInterrupt]):
                 with self.assertRaises(KeyboardInterrupt):
                     service.watch(0.01, stable_reads=2)
             self.assertEqual([body for method, _, body in requests if method == "POST"], [

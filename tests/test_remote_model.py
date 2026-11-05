@@ -12,17 +12,12 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from sts2_advisor.cli import choose_backend_interactively, environment_flag, load_environment
-from sts2_advisor.domain import Evidence
-from sts2_advisor.logging_config import close_logging, configure_logging
-from sts2_advisor.model import (
-    OpenAIAdvisor,
-    SYSTEM_PROMPT,
-    build_prompt,
-    cache_token_counts,
-    clear_codex_cache,
-    model_context_payload,
-)
-from sts2_advisor.normalize import build_decision_context
+from sts2_advisor.contracts import Evidence
+from sts2_advisor.recording.logging import close_logging, configure_logging
+from sts2_advisor.integrations.models.remote import OpenAIAdvisor, cache_token_counts
+from sts2_advisor.decision.prompts import SYSTEM_PROMPT, build_prompt
+from sts2_advisor.decision.context import CodexCache, model_context_payload
+from sts2_advisor.game.state import build_decision_context
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"
@@ -30,7 +25,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "combat_state.json"
 
 class RemoteModelTests(unittest.TestCase):
     def setUp(self) -> None:
-        clear_codex_cache()
+        self.codex_cache = CodexCache()
     def test_environment_flag(self) -> None:
         with patch.dict(os.environ, {"FEATURE": "true"}, clear=True):
             self.assertTrue(environment_flag("FEATURE", False))
@@ -153,8 +148,8 @@ class RemoteModelTests(unittest.TestCase):
         first = build_decision_context(raw)
         second = build_decision_context(moved)
         assert first is not None and second is not None
-        payload_first = model_context_payload(first)
-        payload_second = model_context_payload(second)
+        payload_first = model_context_payload(first, codex_cache=self.codex_cache)
+        payload_second = model_context_payload(second, codex_cache=self.codex_cache)
 
         # 打出的牌从手牌进入弃牌堆：图鉴与整个静态前缀必须逐字节不变，
         # 分歧点只允许出现在 player 动态区（hp 变化）之后。
@@ -168,7 +163,7 @@ class RemoteModelTests(unittest.TestCase):
         raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
         first = build_decision_context(raw)
         assert first is not None
-        deck_before = model_context_payload(first)["stable"]["deck"]
+        deck_before = model_context_payload(first, codex_cache=self.codex_cache)["stable"]["deck"]
 
         # 后续回合：已有卡从手牌进弃牌堆（字段来源变化），新卡生成进手牌。
         later = json.loads(FIXTURE.read_text(encoding="utf-8"))
@@ -181,7 +176,7 @@ class RemoteModelTests(unittest.TestCase):
         )
         second = build_decision_context(later)
         assert second is not None
-        deck_after = model_context_payload(second)["stable"]["deck"]
+        deck_after = model_context_payload(second, codex_cache=self.codex_cache)["stable"]["deck"]
 
         self.assertEqual([entry["k"] for entry in deck_after][: len(deck_before)],
                          [entry["k"] for entry in deck_before])

@@ -6,12 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sts2_advisor.domain import DecisionContext, Evidence
-from sts2_advisor.retrieval import (
-    SeedInjectingRetriever,
-    create_retriever,
-    load_seeds,
-)
+from sts2_advisor.contracts import DecisionContext, Evidence
+from sts2_advisor.integrations.knowledge.seeds import SeedInjectingRetriever, load_seeds
+from sts2_advisor.integrations.knowledge.factory import create_retriever
 
 SEED_RECORD = {
     "evidence_id": "builtin-combat-survival-001",
@@ -49,7 +46,7 @@ class SeedInjectionTests(unittest.TestCase):
         self.knowledge.write_text("", encoding="utf-8")
 
     def retrieve(self, mode: str, context: DecisionContext):
-        with patch("sts2_advisor.retrieval.ChromaRetriever",
+        with patch("sts2_advisor.integrations.knowledge.factory.ChromaRetriever",
                    side_effect=RuntimeError("not installed")):
             retriever = create_retriever(mode, self.root / "chroma", self.knowledge,
                                          facts_path=self.root / "missing.sqlite3",
@@ -104,7 +101,7 @@ class SeedInjectionTests(unittest.TestCase):
         self.assertIn("builtin-combat-survival-001", shipped)
         self.assertIn("builtin-combat-mechanics-001", shipped)
         self.assertIn("builtin-event-hp-trading-001", shipped)
-        with patch("sts2_advisor.retrieval.ChromaRetriever", side_effect=RuntimeError("not installed")):
+        with patch("sts2_advisor.integrations.knowledge.factory.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("json", self.root / "chroma", self.knowledge,
                                          facts_path=self.root / "missing.sqlite3")
         combat = {item.evidence_id for item in retriever.retrieve(make_context("combat_next_action"))}
