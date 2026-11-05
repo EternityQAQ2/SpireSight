@@ -73,6 +73,30 @@ class CliIntegrationTests(unittest.TestCase):
             self.assertFalse(record["training_consent"])
             self.assertEqual(requests, [("GET", "/api/v1/singleplayer")])
 
+    def test_dev_mode_writes_staged_trace_without_recordings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dev_dir = Path(directory) / "dev"
+            with game_api(FIXTURE.read_bytes()) as (url, requests, _):
+                result = self.run_cli(
+                    url, "--backend", "rule", "--rag", "json", "--no-record",
+                    "--dev", "--dev-quiet", "--dev-dir", str(dev_dir),
+                    "--recording-dir", str(Path(directory) / "recordings"),
+                )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(requests, [("GET", "/api/v1/singleplayer")])
+            logs = list(dev_dir.glob("dev-*.log"))
+            self.assertEqual(len(logs), 1)
+            text = logs[0].read_text(encoding="utf-8")
+
+        self.assertIn("[环境信息]", text)
+        self.assertIn("后端: rule", text)
+        self.assertIn("raw_state:", text)
+        self.assertIn("检索 ·", text)
+        self.assertIn("建议生成 · rule 原始建议", text)
+        self.assertIn("最终建议 · 交付结果", text)
+        self.assertIn("[会话汇总]", text)
+        self.assertIn("模型请求: 0", text)
+
     def test_dump_context_returns_legal_candidates(self):
         with game_api(FIXTURE.read_bytes()) as (url, requests, _):
             result = self.run_cli(url, "--dump-context")

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from sts2_advisor.contracts import Advice, DecisionContext, Evidence
+from sts2_advisor.developer import dev_block, dev_request, dev_usage
 from sts2_advisor.decision.prompts import SYSTEM_PROMPT, build_prompt
 from sts2_advisor.decision.context import CodexCache
 from sts2_advisor.decision.parsing import extract_json_object, advice_from_payload
@@ -76,6 +78,16 @@ class TransformersAdvisor:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ]
+        dev_block(
+            "提示词", f"完整提示词（transformers · {self.model_name}）",
+            {"system": SYSTEM_PROMPT, "user": prompt},
+            backend="transformers", model=self.model_name,
+            max_new_tokens=self.max_new_tokens, device=self.device,
+            prompt_chars=len(prompt),
+            chat_template="apply_chat_template(add_generation_prompt=True, enable_thinking=False)",
+        )
+        dev_request("transformers", self.model_name, attempt=1,
+                    max_new_tokens=self.max_new_tokens, device=self.device)
         with recorded_call("model", backend="transformers", request={
             "model": self.model_name, "messages": messages, "device": self.device,
             "max_new_tokens": self.max_new_tokens, "do_sample": False,
@@ -96,8 +108,10 @@ class TransformersAdvisor:
                 record_event("model.input", call_id=call_id, rendered_prompt=rendered,
                              inputs={key: value.tolist() for key, value in inputs.items()},
                              generation_config=generation_config.to_dict() if generation_config else None)
+            input_tokens = int(inputs["input_ids"].numel())
             device = next(self.model.parameters()).device
             inputs = {key: value.to(device) for key, value in inputs.items()}
+            started = time.monotonic()
             with self.torch.inference_mode():
                 output = self.model.generate(
                     **inputs,
@@ -105,10 +119,24 @@ class TransformersAdvisor:
                     do_sample=False,
                     pad_token_id=self.tokenizer.eos_token_id,
                 )
+            duration_ms = (time.monotonic() - started) * 1000
             generated = output[0][inputs["input_ids"].shape[1] :]
             text = self.tokenizer.decode(generated, skip_special_tokens=True)
             record_event("model.response", call_id=call_id, content=text,
                          generated_token_ids=generated.tolist() if recording_enabled() else None)
+            dev_block(
+                "模型输出", "transformers 生成结果",
+                {"content": text} if text else {},
+                call_id=call_id, finish_reason="eos_or_max_new_tokens",
+                duration_ms=round(duration_ms, 1),
+                prompt_tokens=input_tokens, generated_tokens=int(generated.numel()),
+            )
+            dev_usage(
+                "模型", {"prompt_tokens": input_tokens,
+                         "completion_tokens": int(generated.numel())},
+                backend="transformers", model=self.model_name, estimated=True,
+                duration_ms=duration_ms, call_id=call_id,
+            )
             payload = extract_json_object(text)
             record_event("model.parsed", call_id=call_id, payload=payload)
             return advice_from_payload(payload, context)
