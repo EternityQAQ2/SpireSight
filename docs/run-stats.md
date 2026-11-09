@@ -1,6 +1,6 @@
 # AI 战绩统计
 
-生成时间：2026-11-05 20:28 · 来源 `recordings/trajectories.sqlite3` · advisor 退出时自动更新（也可 `python tools/report_runs.py` 手动重建）
+生成时间：2026-11-05 22:18 · 来源 `recordings/trajectories.sqlite3` · advisor 退出时自动更新（也可 `python tools/report_runs.py` 手动重建）
 
 | # | 日期 | 角色 | 进阶 | 最高层 | 幕 | 结局 | 终局HP | 决策 | 模型调用 | 工具有效/调用 | 计划复用 | 确定性 | Prompt tokens | 命中率 |
 |---|------|------|------|--------|----|------|--------|------|----------|---------------|----------|--------|---------------|--------|

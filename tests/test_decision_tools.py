@@ -120,7 +120,7 @@ class DecisionToolTests(unittest.TestCase):
             return self.response(tool=True)
         with self.assertRaisesRegex(RuntimeError, "工具调用"):
             self.backend(create).advise(self.ctx, [])
-        self.assertEqual(len(requests), 4)
+        self.assertEqual(len(requests), 2)
         self.assertEqual(requests[-1]["tool_choice"], "none")
 
     def test_opt_out_omits_tools(self):

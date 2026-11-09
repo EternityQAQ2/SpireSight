@@ -8,11 +8,13 @@ from sts2_advisor.contracts import Advice, DecisionContext, Evidence
 from sts2_advisor.decision.prompts import SYSTEM_PROMPT, build_prompt
 from sts2_advisor.decision.context import CodexCache
 from sts2_advisor.decision.tools import DecisionTools, TOOL_SCHEMAS
+from sts2_advisor.game.combat.calculator import calculate
 from sts2_advisor.decision.parsing import extract_json_object, advice_from_payload
 from sts2_advisor.recording.logging import get_logger
 from sts2_advisor.recording.trajectory import record_event, recorded_call
 
 logger = get_logger("model")
+KILL_CLAIM = re.compile(r"(?<!不)(?<!未)(?<!无)(?<!法)(?:秒杀|斩杀|可击杀)")
 
 
 class OpenAIAdvisor:
@@ -57,9 +59,9 @@ class OpenAIAdvisor:
         tools_enabled = self.function_calling and context.decision_type == "combat_next_action"
         if tools_enabled:
             messages[0]["content"] += (
-                "\n可调用 evaluate_combat_plan 试算你提出的动作序列。费用、斩杀或防御存在疑问时先调用；"
-                "比较不同方案后自行决策。工具只计算，不执行动作。exact=false 时不能把未知当作零。"
-                "最多 3 轮、8 次工具调用，最后仍须返回要求的建议 JSON。"
+                "\n可调用 calculate_attack 核对单张攻击牌，传入预期目标剩余生命；目标修正由工具读取。"
+                "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
+                "出现不一致时根据工具结果重新决策一次；最后返回要求的建议 JSON。"
             )
         logger.info(
             "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
@@ -71,8 +73,8 @@ class OpenAIAdvisor:
             dispatcher = DecisionTools(context)
             calls_used = 0
             tool_results = []
-            for round_index in range(4):
-                options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index < 3 and calls_used < 8 else "none"} if tools_enabled else {}
+            for round_index in range(2):
+                options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index == 0 and calls_used < 8 else "none"} if tools_enabled else {}
                 content, reasoning, finish_reason, assistant = self._complete(
                     messages, self.max_tokens, context.decision_id, **options)
                 tool_calls = assistant.get("tool_calls") or []
@@ -83,8 +85,22 @@ class OpenAIAdvisor:
                             context.decision_id, **options)
                         tool_calls = assistant.get("tool_calls") or []
                     if not tool_calls:
+                        if tools_enabled and round_index == 0 and content:
+                            provisional = advice_from_payload(extract_json_object(content), context)
+                            if KILL_CLAIM.search(provisional.reason):
+                                candidate = next((c for c in context.candidates if c.candidate_id == provisional.candidate_id), None)
+                                enemy = next((e for e in (context.situation.get("battle") or {}).get("enemies", [])
+                                              if candidate and e.get("entity_id") == candidate.params.get("target")), None)
+                                if enemy:
+                                    check = calculate(context, provisional.candidate_id, 0)
+                                    record_event("decision.attack_check", decision_id=context.decision_id, result=check)
+                                    tool_results.append(check)
+                                    if check.get("status") == "calculated" and not check.get("matches"):
+                                        messages.append({"role": "assistant", "content": content})
+                                        messages.append({"role": "user", "content": "你的击杀判断与计算结果矛盾。请重新选择一次并返回最终 JSON：" + json.dumps(check, ensure_ascii=False)})
+                                        continue
                         break
-                if not tools_enabled or round_index == 3 or len(tool_calls) > 8:
+                if not tools_enabled or round_index == 1 or len(tool_calls) > 8:
                     raise ValueError("模型超出工具调用轮数或批量上限")
                 messages.append(assistant)
                 for call in tool_calls:
@@ -94,7 +110,7 @@ class OpenAIAdvisor:
                     calls_used += 1
                     tool_results.append(result)
                     record_event("model.tool_result", decision_id=context.decision_id,
-                                 tool_call_id=call["id"], name=function.get("name"), result=result)
+                                 tool_call_id=call["id"], name=function.get("name"), arguments=function.get("arguments"), result=result)
                     messages.append({"role": "tool", "tool_call_id": call["id"],
                                      "content": json.dumps(result, ensure_ascii=False)})
         except Exception as exc:
@@ -113,7 +129,7 @@ class OpenAIAdvisor:
                 detail = "；服务只返回了 reasoning_content，可能是输出上限过小或模型接口不兼容"
             raise ValueError(f"远程模型返回了空内容{detail}，请查看运行日志")
         advice = advice_from_payload(extract_json_object(content), context)
-        if tool_results:
+        if tool_results and all("status" not in r for r in tool_results):
             chosen = dispatcher.evaluate(advice.plan_candidate_ids or [advice.candidate_id])
             claim = re.search(r"秒杀|斩杀|可击杀|仅\d+点伤害|只受\d+点伤害", advice.reason)
             contradicted = bool(chosen.get("exact") and chosen.get("projection") and
@@ -124,6 +140,18 @@ class OpenAIAdvisor:
                                  "当前机制无法完整试算；先执行一步并重新观测。",
                                  confidence=min(advice.confidence, 0.4),
                                  warnings=advice.warnings + ["计划试算不支持或与斩杀断言矛盾，原理由中的确定性判断已撤回"])
+        selected = next((r for r in tool_results if r.get("candidate_id") == advice.candidate_id and r.get("status") == "calculated"), None)
+        if tools_enabled and KILL_CLAIM.search(advice.reason) and not selected:
+            candidate = next((c for c in context.candidates if c.candidate_id == advice.candidate_id), None)
+            enemy = next((e for e in (context.situation.get("battle") or {}).get("enemies", [])
+                          if candidate and e.get("entity_id") == candidate.params.get("target")), None)
+            if enemy:
+                selected = calculate(context, advice.candidate_id, 0)
+                record_event("decision.attack_check", decision_id=context.decision_id, result=selected)
+        if selected and selected.get("status") == "calculated" and not selected["target_defeated"] and KILL_CLAIM.search(advice.reason):
+            advice = replace(advice, reason="计算结果显示目标仍有生命，先执行一步并重新观测。",
+                             confidence=min(advice.confidence, 0.4),
+                             warnings=advice.warnings + ["攻击计算结果与击杀断言矛盾"])
         return advice
 
     def _complete(

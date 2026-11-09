@@ -7,15 +7,17 @@ import json
 from sts2_advisor.contracts import DecisionContext
 from sts2_advisor.decision.plan_check import check_plan
 from sts2_advisor.game.combat.simulation import initial_state, play, outcome, unsupported_mechanics
+from sts2_advisor.game.combat.calculator import calculate
 
 
 TOOL_SCHEMAS = [{"type": "function", "function": {
-    "name": "evaluate_combat_plan",
-    "description": "试算你提出的出牌顺序；只计算，不执行游戏动作。可多次调用以比较攻击、防御、清随从方案。未支持的效果明确报告未知。",
+    "name": "calculate_attack",
+    "description": "核对当前一张攻击牌对指定目标的直接伤害；不执行动作，不预测其他效果。手牌伤害已包含玩家力量等修正。",
     "parameters": {"type": "object", "properties": {
         "decision_id": {"type": "string", "description": "当前输入的 decision_id"},
-        "candidate_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 8},
-    }, "required": ["decision_id", "candidate_ids"], "additionalProperties": False},
+        "candidate_id": {"type": "string", "description": "当前攻击候选 ID"},
+        "expected_hp_after": {"type": "integer", "minimum": 0, "description": "预计目标攻击后剩余生命"},
+    }, "required": ["decision_id", "candidate_id", "expected_hp_after"], "additionalProperties": False},
 }}]
 
 
@@ -25,11 +27,21 @@ class DecisionTools:
 
     def call(self, name: str, arguments: str) -> dict:
         try:
-            if name != "evaluate_combat_plan":
+            if name not in {"evaluate_combat_plan", "calculate_attack"}:
                 raise ValueError("未知工具")
             if len(arguments) > 8192:
                 raise ValueError("参数过长")
             args = json.loads(arguments)
+            if name == "calculate_attack":
+                if self.context.decision_type != "combat_next_action":
+                    raise ValueError("仅支持战斗局面")
+                if not isinstance(args, dict) or set(args) != {"decision_id", "candidate_id", "expected_hp_after"}:
+                    raise ValueError("参数必须包含 decision_id、candidate_id 和 expected_hp_after")
+                if args["decision_id"] != self.context.decision_id:
+                    raise ValueError("过期 decision_id")
+                if not isinstance(args["candidate_id"], str) or type(args["expected_hp_after"]) is not int or args["expected_hp_after"] < 0:
+                    raise ValueError("攻击参数类型错误")
+                return calculate(self.context, args["candidate_id"], args["expected_hp_after"])
             if not isinstance(args, dict) or set(args) != {"decision_id", "candidate_ids"}:
                 raise ValueError("需要 decision_id 和 candidate_ids")
             if args["decision_id"] != self.context.decision_id:
