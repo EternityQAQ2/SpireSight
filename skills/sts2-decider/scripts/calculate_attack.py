@@ -11,7 +11,7 @@ def main():
     parser.add_argument('--record', type=Path, required=True)
     parser.add_argument('--index', type=int, required=True)
     parser.add_argument('--candidate', required=True)
-    parser.add_argument('--expected-hp', type=int, required=True)
+    parser.add_argument('--expected-hp', type=int, help='Optional historical prediction check')
     args = parser.parse_args()
     sys.path.insert(0, str(args.project.resolve() / 'src'))
     from sts2_advisor.contracts import Candidate, DecisionContext
@@ -24,9 +24,10 @@ def main():
     raw = dict(rows[args.index]['context'])
     raw['candidates'] = [Candidate(**item) for item in raw['candidates']]
     context = DecisionContext(**raw)
-    result = DecisionTools(context).call('calculate_attack', json.dumps({
-        'decision_id': context.decision_id, 'candidate_id': args.candidate,
-        'expected_hp_after': args.expected_hp}))
+    arguments = {'decision_id': context.decision_id, 'candidate_id': args.candidate}
+    if args.expected_hp is not None:
+        arguments['expected_hp_after'] = args.expected_hp
+    result = DecisionTools(context).call('calculate_attack', json.dumps(arguments))
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

@@ -10,7 +10,8 @@ class CombatComparisonPromptTests(unittest.TestCase):
     def test_system_loads_versioned_skill(self):
         prompt = build_system_prompt()
         self.assertIn('# STS2 Decider', prompt)
-        self.assertIn('expected_hp_after', prompt)
+        self.assertIn('candidate_id', prompt)
+        self.assertIn('Do not predict HP before calling', prompt)
         self.assertNotIn('description: Analyze', prompt)
 
     def test_combat_requests_comparison(self):

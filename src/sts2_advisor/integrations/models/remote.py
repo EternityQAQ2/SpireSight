@@ -72,7 +72,7 @@ class OpenAIAdvisor:
         tools_enabled = self.function_calling and context.decision_type == "combat_next_action"
         if tools_enabled:
             messages[0]["content"] += (
-                "\n可调用 calculate_attack 核对单张攻击牌，传入预期目标剩余生命；目标修正由工具读取。"
+                "\n可调用 calculate_attack 计算单张攻击牌，只指定局面和候选动作；数值和目标修正由工具读取。"
                 "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
                 "由你结合工具结果选择行动；最后返回要求的建议 JSON。"
             )

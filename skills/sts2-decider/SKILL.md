@@ -25,7 +25,7 @@ Use `scripts/calculate_attack.py` for a recorded decision. It imports the existi
 
 `--index` is zero-based. Candidate ID includes the card and target. Life, block and supported modifiers are read from the recorded context. This calculates ONE attack from that snapshot, not a sequence or a turn. Each separate call starts from the same snapshot. Unsupported effects return unknown. `--expected-hp` is your prediction of target life after this attack, not its starting life; a mismatch is numerical evidence, not a verdict on strategy.
 
-For application function calling, the existing `calculate_attack` accepts `decision_id`, `candidate_id`, `expected_hp_after` through `DecisionTools`. A Markdown skill does not register functions with a remote model API; the application's dispatcher does that.
+For application function calling, `calculate_attack` needs only `decision_id` and `candidate_id` through `DecisionTools`. Do not predict HP before calling: the tool returns remaining HP. The offline `--expected-hp` flag is an optional historical check. Current hand damage/cost already includes player strength, weakness, shrink and free-attack modifiers; do not apply them again. Only supported target modifiers are applied by the calculator. A Markdown skill does not register functions with a remote model API; the application's dispatcher does that.
 
 ## Review and output
 

@@ -69,6 +69,62 @@ class AttackCalculatorTests(unittest.TestCase):
         self.assertEqual(result["target_hp_after"], 0)
         self.assertEqual(result["hits"], 2)
 
+    def test_calculator_no_longer_requires_a_model_prediction(self):
+        ctx = build_decision_context(self.rows['group'])
+        result = DecisionTools(ctx).call('calculate_attack', json.dumps({
+            'decision_id': ctx.decision_id, 'candidate_id': 'card:2:WRIGGLER_3'}))
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['target_hp_after'], 6)
+        self.assertNotIn('matches', result)
+        from sts2_advisor.decision.tools import TOOL_SCHEMAS
+        params = TOOL_SCHEMAS[0]['function']['parameters']
+        self.assertEqual(set(params['required']), {'decision_id', 'candidate_id'})
+        self.assertNotIn('expected_hp_after', params['properties'])
+
+    def test_recorded_zero_cost_kill_ignores_unrelated_relics_and_displayed_modifiers(self):
+        from evals.compare_prompts import restore
+        rows = [json.loads(s) for s in Path('evals/fixtures/prompt_cases.jsonl').read_text(encoding='utf-8').splitlines()]
+        ctx, _ = restore(next(r for r in rows if r['case_id'] == 'zero-cost-kill'))
+        result = self.call(ctx, 'card:2:SHRINKER_BEETLE_0', 0)
+        self.assertEqual(result['status'], 'calculated')
+        self.assertEqual(result['damage_per_hit'], 10)
+        self.assertEqual(result['target_hp_after'], 0)
+        self.assertEqual(result['target_block_after'], 0)
+
+    def test_truly_unknown_player_or_relic_effect_still_returns_unknown(self):
+        for source in ['status', 'relics']:
+            raw = copy.deepcopy(self.rows['group'])
+            raw['player'].setdefault(source, []).append({'id': 'UNVERIFIED_EFFECT', 'amount': 1})
+            ctx = build_decision_context(raw)
+            self.assertEqual(self.call(ctx, 'card:2:WRIGGLER_3', 6)['status'], 'unknown')
+
+    def test_slippery_applies_only_to_hits_that_reach_hp(self):
+        raw = copy.deepcopy(self.rows['group'])
+        raw['player']['hand'][0]['description'] = '造成3点伤害4次。'
+        raw['battle']['enemies'][0].update(hp=18, block=4,
+            status=[{'id': 'SLIPPERY_POWER', 'amount': 1}, {'id': 'MINION_POWER', 'amount': 1}])
+        ctx = build_decision_context(raw)
+        result = self.call(ctx, 'card:0:WRIGGLER_0', 11)
+        self.assertEqual(result['status'], 'calculated')
+        self.assertEqual(result['target_hp_after'], 11)
+        self.assertEqual(result['target_block_after'], 0)
+        self.assertEqual(result['slippery_remaining'], 0)
+
+    def test_missing_target_modifier_is_unknown_instead_of_zero(self):
+        raw = copy.deepcopy(self.rows['group'])
+        for amount in [None, '?']:
+            raw['battle']['enemies'][0]['status'] = [{'id': 'VULNERABLE_POWER', 'amount': amount}]
+            ctx = build_decision_context(raw)
+            self.assertEqual(self.call(ctx, 'card:2:WRIGGLER_0', 7)['status'], 'unknown')
+
+    def test_unknown_target_hp_or_block_is_not_zero(self):
+        for field in ['hp', 'block']:
+            ctx = build_decision_context(self.rows['group'])
+            situation = copy.deepcopy(ctx.situation)
+            situation['battle']['enemies'][0][field] = None
+            ctx = replace(ctx, situation=situation)
+            self.assertEqual(self.call(ctx, 'card:2:WRIGGLER_0', 0)['status'], 'unknown')
+
     def test_model_reason_is_not_automatically_checked_or_rewritten(self):
         ctx = build_decision_context(self.rows["group"])
         requests = []

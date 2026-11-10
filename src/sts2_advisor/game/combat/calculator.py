@@ -5,8 +5,13 @@ import re
 from sts2_advisor.contracts import DecisionContext
 
 
-PASSIVE_RELICS = {"BURNING_BLOOD", "NEOWS_TALISMAN", "SCROLL_BOXES", "STONE_HUMIDIFIER",
-                  "BOOK_OF_FIVE_RINGS", "KALEIDOSCOPE", "LANTERN", "POTION_BELT", "MEAL_TICKET"}
+DIRECT_ATTACK_NEUTRAL_RELICS = {"BURNING_BLOOD", "NEOWS_TALISMAN", "SCROLL_BOXES", "STONE_HUMIDIFIER",
+                  "BOOK_OF_FIVE_RINGS", "KALEIDOSCOPE", "LANTERN", "POTION_BELT", "MEAL_TICKET",
+                  # Pickup inventory; first POWER block; end-turn-seven damage.
+                  # None modifies this Attack card's direct hit on its target.
+                  "PHIAL_HOLSTER", "PERMAFROST", "STONE_CALENDAR"}
+
+DISPLAYED_PLAYER_MODIFIERS = {"STRENGTH", "WEAK", "DEXTERITY", "FRAIL", "SHRINK", "FLEX_POTION", "FREE_ATTACK"}
 
 
 def target_modifiers(target: dict) -> list[dict]:
@@ -22,7 +27,7 @@ def target_modifiers(target: dict) -> list[dict]:
     return result
 
 
-def calculate(context: DecisionContext, candidate_id: str, expected_hp_after: int) -> dict:
+def calculate(context: DecisionContext, candidate_id: str, expected_hp_after: int | None = None) -> dict:
     candidate = next((c for c in context.candidates if c.candidate_id == candidate_id and c.legal), None)
     if candidate is None or candidate.action_type != "play_card":
         return {"ok": False, "error": "动作不是当前可用出牌"}
@@ -37,24 +42,29 @@ def calculate(context: DecisionContext, candidate_id: str, expected_hp_after: in
         return {"ok": True, "status": "unknown", "reason": "攻击数值、次数或目标不确定"}
     hits = 2 if match.group(2) == "两" else int(match.group(2) or 1)
     reasons = []
-    # Current hand damage already includes player strength and weakness.
+    for field in ('hp', 'block'):
+        if type(target.get(field)) is not int or target[field] < 0:
+            reasons.append('目标' + field + '未知')
+    # Current hand damage/cost already includes these observed player modifiers.
     for status in context.player.get("status", []):
-        if str(status.get("id", "")).upper().removesuffix("_POWER") not in {"STRENGTH", "WEAK", "DEXTERITY", "FRAIL"}:
+        if str(status.get("id", "")).upper().removesuffix("_POWER") not in DISPLAYED_PLAYER_MODIFIERS:
             reasons.append("玩家状态:" + str(status.get("id")))
-    applied = target_modifiers(target)
     for status in target.get("status", []):
         ident = str(status.get("id", "")).upper().removesuffix("_POWER")
-        if ident == "SLOW" and (type(status.get("amount")) is not int or not 0 <= status["amount"] <= 1000):
+        if ident in {'VULNERABLE', 'SLIPPERY'} and (type(status.get('amount')) is not int or status['amount'] < 0):
+            reasons.append('目标状态:' + ident + '数值未知')
+        elif ident == "SLOW" and (type(status.get("amount")) is not int or not 0 <= status["amount"] <= 1000):
             reasons.append("目标状态:SLOW数值未知")
         elif ident == "SLOW" and hits > 1:
             reasons.append("缓慢与多段攻击的结算时序尚未确认")
-        elif ident not in {"VULNERABLE", "SLOW", "STRENGTH", "WEAK", "ARTIFACT"}:
+        elif ident not in {"VULNERABLE", "SLOW", "SLIPPERY", "MINION", "STRENGTH", "WEAK", "ARTIFACT"}:
             reasons.append("目标状态:" + ident)
     for relic in context.player.get("relics", []):
-        if relic.get("id") not in PASSIVE_RELICS:
+        if relic.get("id") not in DIRECT_ATTACK_NEUTRAL_RELICS:
             reasons.append("遗物:" + str(relic.get("id")))
     if reasons:
         return {"ok": True, "status": "unknown", "reason": "未支持的影响: " + ", ".join(reasons)}
+    applied = target_modifiers(target)
     numerator, denominator = int(match.group(1)), 1
     for modifier in applied:
         numerator *= modifier["numerator"]
@@ -62,15 +72,26 @@ def calculate(context: DecisionContext, candidate_id: str, expected_hp_after: in
     damage = numerator // denominator
     hp, block = int(target.get("hp") or 0), int(target.get("block") or 0)
     initial_hp, initial_block = hp, block
+    slippery = sum(s.get('amount') or 0 for s in target.get('status', [])
+                   if str(s.get('id', '')).upper().removesuffix('_POWER') == 'SLIPPERY')
     for _ in range(hits):
         if hp <= 0:
             break
         absorbed = min(block, damage)
         block -= absorbed
-        hp = max(0, hp - (damage - absorbed))
-    return {"ok": True, "status": "calculated", "candidate_id": candidate_id,
+        hp_damage = damage - absorbed
+        if hp_damage > 0 and slippery > 0:
+            hp_damage = min(hp_damage, 1)
+            slippery -= 1
+        hp = max(0, hp - hp_damage)
+    result = {"ok": True, "status": "calculated", "candidate_id": candidate_id,
             "target_hp_before": initial_hp, "target_block_before": initial_block,
             "damage_per_hit": damage, "hits": hits, "target_hp_after": hp,
             "target_block_after": block, "target_defeated": hp == 0,
-            "expected_hp_after": expected_hp_after, "matches": hp == expected_hp_after,
-            "scope": "仅此张牌对指定目标的直接伤害；不预测其他效果或回合结果"}
+            'hp_damage': initial_hp - hp,
+            "scope": "仅此张牌直接伤害；牌面已含玩家修正，只再计算目标修正；不预测其他效果或回合结果"}
+    if any(str(s.get('id', '')).upper().removesuffix('_POWER') == 'SLIPPERY' for s in target.get('status', [])):
+        result['slippery_remaining'] = slippery
+    if expected_hp_after is not None:
+        result.update(expected_hp_after=expected_hp_after, matches=hp == expected_hp_after)
+    return result
