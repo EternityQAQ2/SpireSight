@@ -8,6 +8,8 @@
 
 模型侧复测使用 `python -m evals.replay_retrieval_decisions`：默认只列输入，加 `--run --output 新路径` 才调用API。保持当前提示词不变，以冻结的前后检索证据做8组成对比较，共享32请求、160000 token预算。首轮结果未观察到稳定决策提升，详见 [模型复测报告](../docs/retrieval-decision-eval-20261110.md)。
 
+计算器/模型四组实验使用 `python -m evals.compare_decision_options`，加 `--run --output 新路径` 才请求API。对比旧工具Flash、新工具Flash、两方案摘要Flash和新工具Pro，均关闭思考，最多64请求/360000 token。已采用计算器修复，其余实验配置未上线；[四组结果报告](../docs/calculator-model-eval-20261110.md)记录token、错误、成功率和时延。
+
 `fixtures/log_cases.jsonl` 冻结了 2026-11-03 最近一局中的三个真实局面：三能量五费连招、缺少持牌清单的选牌、包含全身撞击和铁斩波的战斗。每行保留来源会话、步骤与事件序号，运行时不读取会变化的轨迹数据库。
 
 不调用模型或游戏的基线分析：

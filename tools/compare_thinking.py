@@ -13,13 +13,14 @@ from sts2_advisor.contracts import Candidate, DecisionContext, Evidence
 from sts2_advisor.integrations.models.remote import OpenAIAdvisor
 
 
-def run_case(row: dict, mode: str, max_tokens: int, prompt_variant: str = 'current', *, budget=None) -> dict:
+def run_case(row: dict, mode: str, max_tokens: int, prompt_variant: str = 'current', *,
+             budget=None, model_name: str | None = None, request_transform=None) -> dict:
     started = time.perf_counter()
     raw = dict(row["context"])
     raw["candidates"] = [Candidate(**item) for item in raw["candidates"]]
     context = DecisionContext(**raw)
     evidence = [Evidence(**item) for item in row["evidence"]]
-    backend = OpenAIAdvisor(os.environ["OPENAI_MODEL"], api_key=os.environ["OPENAI_API_KEY"],
+    backend = OpenAIAdvisor(model_name or os.environ["OPENAI_MODEL"], api_key=os.environ["OPENAI_API_KEY"],
         base_url=os.environ.get("OPENAI_BASE_URL") or None,
         thinking='disabled' if mode == 'adaptive' else mode,
         adaptive_thinking=mode == 'adaptive', max_tokens=max_tokens)
@@ -34,6 +35,8 @@ def run_case(row: dict, mode: str, max_tokens: int, prompt_variant: str = 'curre
         nonlocal request_count
         if request_count >= 2:
             raise RuntimeError("已达到每个局面每种模式最多 2 次请求")
+        if request_transform is not None:
+            kwargs = request_transform(kwargs)
         if budget is not None:
             budget.reserve(kwargs)
         request_count += 1
@@ -53,7 +56,7 @@ def run_case(row: dict, mode: str, max_tokens: int, prompt_variant: str = 'curre
         if event_type in {"model.response", "model.tool_result", "decision.attack_check"}:
             events.append({"type": event_type, "data": payload})
 
-    result = {"mode": mode, "prompt_variant": prompt_variant, "decision_id": context.decision_id,
+    result = {"mode": mode, "model": backend.model_name, "prompt_variant": prompt_variant, "decision_id": context.decision_id,
               "evidence_ids": [e.evidence_id for e in evidence]}
     try:
         from sts2_advisor.decision.prompts import build_prompt, build_system_prompt
