@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.decision.context import CodexCache, model_context_payload
 
@@ -24,6 +25,18 @@ stable.deck 是卡牌图鉴，不是本局持牌清单，也不是动态数值�
 confidence 范围 0 至 1；无值的数组用 []。"""
 
 
+def build_system_prompt() -> str:
+    """Load the versioned project skill; installed Codex copies are independent."""
+    packaged = Path(__file__).parent / 'skills/sts2-decider/SKILL.md'
+    source = Path(__file__).resolve().parents[3] / 'skills/sts2-decider/SKILL.md'
+    text = (packaged if packaged.is_file() else source).read_text(encoding='utf-8')
+    if text.startswith('---\n'):
+        text = text.split('---\n', 2)[2]
+    return (SYSTEM_PROMPT + '\n加载的决策 skill（sts2-decider）：\n' + text.strip()
+            + '\n当前通过 API 决策，请使用已提供的 function tools；无 shell 或脚本执行能力。'
+              '按上面的建议 JSON 格式返回，不执行游戏动作。')
+
+
 def build_prompt(context: DecisionContext, evidence: list[Evidence], *, codex_cache: CodexCache | None = None) -> str:
     payload = model_context_payload(context, codex_cache=codex_cache)
     payload["evidence"] = [
@@ -31,4 +44,10 @@ def build_prompt(context: DecisionContext, evidence: list[Evidence], *, codex_ca
         for item in evidence
     ]
     payload["decision_id"] = context.decision_id
-    return "输入 JSON：" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    comparison = ""
+    if context.decision_type == "combat_next_action":
+        comparison = ("战斗决策前比较至少两个本回合可行方案：分别考虑总费用、确定击杀的敌人、"
+                      "敌人攻击与其他伤害导致的预计生命损失，以及后续收益；不能确定的数值标为未知。"
+                      "抽牌、随机效果或状态变化后重新观察，不假设结果。reason 简短比较所选方案与一个备选方案的主要取舍。"
+                      "例如：5格挡面对23伤仍可减少5点生命损失；攻击只有在击杀或其他效果阻止攻击时才减少本回合伤害。\n")
+    return comparison + "输入 JSON：" + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

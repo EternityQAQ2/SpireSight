@@ -173,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
                 max_tokens=remote_max_tokens,
                 json_mode=environment_flag("OPENAI_JSON_MODE", True),
                 thinking=thinking,
+                reasoning_effort=os.environ.get('OPENAI_REASONING_EFFORT', '').strip().lower() or None,
+                adaptive_thinking=environment_flag('OPENAI_ADAPTIVE_THINKING', False),
                 function_calling=environment_flag("OPENAI_FUNCTION_CALLING", True),
             )
         except Exception as exc:
@@ -181,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         fallback = RuleAdvisor()
         print(
             f"远程模型：{remote_model}（最大输出 {remote_max_tokens} tokens，"
-            f"思考模式 {thinking or '服务默认'}）"
+            f"思考模式 {'按战斗局面自动切换（困难战斗至少16384输出）' if backend.adaptive_thinking else thinking or '服务默认'}）"
         )
     else:
         backend = RuleAdvisor()

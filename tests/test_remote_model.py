@@ -112,7 +112,7 @@ class RemoteModelTests(unittest.TestCase):
         self.assertEqual(prompt.count("牌堆独有的冗长说明"), 1)
         self.assertLess(prompt.index('"evidence"'), prompt.index('"decision_id"'))
 
-        payload = json.loads(prompt.removeprefix("输入 JSON："))
+        payload = json.loads(prompt.split("输入 JSON：", 1)[1])
         self.assertEqual(
             list(payload)[:4],
             ["stable", "run", "state_type", "decision_type"],

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sts2_advisor.contracts import Advice, Candidate, DecisionContext, Evidence
 from sts2_advisor.decision.plan_check import check_plan
 from sts2_advisor.game.combat.effects import energy_cost, energy_gain
+from sts2_advisor.game.combat.simulation import initial_state, play
 
 
 PLANNABLE_DECISIONS = {"combat_next_action", "shop", "fake_merchant", "rewards"}
@@ -216,6 +217,46 @@ def combat_transition_is_safe(
         return False
 
     old_hand = previous.player.get("hand", [])
+    projected = initial_state(previous)
+    if projected is None:
+        return False
+    old_candidates = list(previous.candidates)
+    for step in completed:
+        candidate = next((c for c in old_candidates if matches_step(c, step)
+                          and c.params.get('card_index') == step.params.get('card_index')), None)
+        card = next((c for c in old_hand if c.get('index') == step.params.get('card_index')), None)
+        if candidate is None or card is None:
+            return False
+        projected = play(projected, candidate, card)
+        if projected is None or projected.boundary:
+            return False
+    if (current.player.get('hp') != projected.hp or
+            current.player.get('block') != projected.block):
+        return False
+    if initial_state(current) is None:
+        return False
+    actual_enemies = {e.get('entity_id'): e for e in new_battle.get('enemies', [])}
+    for enemy in projected.enemies:
+        observed = actual_enemies.get(enemy.entity_id)
+        if enemy.hp <= 0:
+            if observed is not None and observed.get('hp', 0) > 0:
+                return False
+        elif observed is None or observed.get('hp') != enemy.hp or observed.get('block', 0) != enemy.block:
+            return False
+        if observed and enemy.hp > 0:
+            statuses = {str(s.get('id', '')).upper().removesuffix('_POWER'): s.get('amount') or 0
+                        for s in observed.get('status', [])}
+            if any(statuses.get(k, 0) != v for k, v in
+                   [('VULNERABLE', enemy.vulnerable), ('ARTIFACT', enemy.artifact), ('SLIPPERY', enemy.slippery)]):
+                return False
+    player_status = {str(s.get('id', '')).upper().removesuffix('_POWER'): s.get('amount') or 0
+                     for s in current.player.get('status', [])}
+    if player_status.get('STRENGTH', 0) != projected.strength + projected.strength_delta:
+        return False
+    if player_status.get('RAGE', 0) != projected.rage:
+        return False
+    if any(ident not in {e.entity_id for e in projected.enemies} for ident in actual_enemies):
+        return False
     expected_energy = int(previous.player.get("energy") or 0)
     for step in completed:
         card = next((c for c in old_hand if c.get("index") == step.params.get("card_index")), None)

@@ -1,0 +1,343 @@
+{
+  "chain": [
+    "SeedInjectingRetriever",
+    "SqliteFactsRetriever",
+    "ChromaRetriever"
+  ],
+  "vector_documents": 50,
+  "top_k": 6,
+  "seeds_outside_top_k": true,
+  "cases": [
+    {
+      "case_id": "debuff-order",
+      "sources": {
+        "seed": 2,
+        "sqlite": 3
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:monsters:shrinker_beetle"
+      ]
+    },
+    {
+      "case_id": "last-energy",
+      "sources": {
+        "seed": 2,
+        "vector": 1,
+        "sqlite": 5
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "guide-70cabf4b58f6eef7",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:powers:slow",
+        "sqlite:powers:vulnerable",
+        "sqlite:monsters:bygone_effigy"
+      ]
+    },
+    {
+      "case_id": "partial-block",
+      "sources": {
+        "seed": 2,
+        "vector": 1,
+        "sqlite": 5
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "guide-70cabf4b58f6eef7",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:powers:slow",
+        "sqlite:powers:strength",
+        "sqlite:powers:vulnerable"
+      ]
+    },
+    {
+      "case_id": "slippery",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern",
+        "sqlite:potions:beetle_juice",
+        "sqlite:powers:slippery",
+        "sqlite:monsters:inklet"
+      ]
+    },
+    {
+      "case_id": "draw-first",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern",
+        "sqlite:relics:potion_belt",
+        "sqlite:potions:beetle_juice",
+        "sqlite:powers:constrict"
+      ]
+    },
+    {
+      "case_id": "four-enemies",
+      "sources": {
+        "seed": 2,
+        "vector": 1,
+        "sqlite": 5
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "guide-70cabf4b58f6eef7",
+        "sqlite:interactions:1",
+        "sqlite:interactions:23",
+        "sqlite:interactions:31",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope"
+      ]
+    },
+    {
+      "case_id": "reward-exhaust",
+      "sources": {
+        "vector": 3,
+        "sqlite": 3
+      },
+      "ids": [
+        "guide-d64b8153c180864b",
+        "guide-c2dc32d8c6b63746",
+        "guide-ed1f08b0abcdf128",
+        "sqlite:cards:anger",
+        "sqlite:cards:fiend_fire",
+        "sqlite:cards:iron_wave"
+      ]
+    },
+    {
+      "case_id": "reward-scaling",
+      "sources": {
+        "vector": 3,
+        "sqlite": 3
+      },
+      "ids": [
+        "guide-c2dc32d8c6b63746",
+        "guide-d64b8153c180864b",
+        "guide-ed1f08b0abcdf128",
+        "sqlite:cards:body_slam",
+        "sqlite:cards:inflame",
+        "sqlite:cards:unrelenting"
+      ]
+    },
+    {
+      "case_id": "rest-low",
+      "sources": {
+        "seed": 1,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-rest-low-hp-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern",
+        "sqlite:relics:potion_belt",
+        "sqlite:potions:beetle_juice",
+        "sqlite:intents:heal"
+      ]
+    },
+    {
+      "case_id": "rest-middle",
+      "sources": {
+        "seed": 1,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-rest-low-hp-001",
+        "sqlite:interactions:23",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern",
+        "sqlite:relics:potion_belt",
+        "sqlite:potions:beetle_juice"
+      ]
+    },
+    {
+      "case_id": "event-spring",
+      "sources": {
+        "seed": 1,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-event-hp-trading-001",
+        "sqlite:interactions:23",
+        "sqlite:cards:guilty",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern",
+        "sqlite:relics:potion_belt"
+      ]
+    },
+    {
+      "case_id": "rest-boss",
+      "sources": {
+        "seed": 1,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-rest-low-hp-001",
+        "sqlite:interactions:1",
+        "sqlite:interactions:23",
+        "sqlite:interactions:31",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:kaleidoscope",
+        "sqlite:relics:lantern"
+      ]
+    },
+    {
+      "case_id": "two-enemies",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:permafrost",
+        "sqlite:relics:phial_holster",
+        "sqlite:relics:stone_calendar",
+        "sqlite:potions:flex_potion",
+        "sqlite:powers:flex_potion"
+      ]
+    },
+    {
+      "case_id": "already-blocked",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:permafrost",
+        "sqlite:relics:phial_holster",
+        "sqlite:relics:stone_calendar",
+        "sqlite:potions:flex_potion",
+        "sqlite:powers:flex_potion"
+      ]
+    },
+    {
+      "case_id": "zero-cost-kill",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:permafrost",
+        "sqlite:relics:phial_holster",
+        "sqlite:relics:stone_calendar",
+        "sqlite:potions:flex_potion",
+        "sqlite:powers:flex_potion"
+      ]
+    },
+    {
+      "case_id": "cheap-lethal",
+      "sources": {
+        "seed": 2,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:permafrost",
+        "sqlite:relics:phial_holster",
+        "sqlite:relics:stone_calendar",
+        "sqlite:powers:strength",
+        "sqlite:monsters:fuzzy_wurm_crawler"
+      ]
+    },
+    {
+      "case_id": "reward-defense",
+      "sources": {
+        "vector": 3,
+        "sqlite": 3
+      },
+      "ids": [
+        "guide-d64b8153c180864b",
+        "guide-c2dc32d8c6b63746",
+        "guide-2cfa50493ef58f3d",
+        "sqlite:interactions:27",
+        "sqlite:interactions:28",
+        "sqlite:interactions:29"
+      ]
+    },
+    {
+      "case_id": "rest-heldout",
+      "sources": {
+        "seed": 1,
+        "sqlite": 6
+      },
+      "ids": [
+        "builtin-rest-low-hp-001",
+        "sqlite:interactions:27",
+        "sqlite:interactions:28",
+        "sqlite:interactions:29",
+        "sqlite:relics:burning_blood",
+        "sqlite:relics:permafrost",
+        "sqlite:relics:phial_holster"
+      ]
+    },
+    {
+      "case_id": "boss-opening",
+      "sources": {
+        "seed": 2,
+        "vector": 3,
+        "sqlite": 3
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "guide-f98aa2ce3e038e25",
+        "guide-70cabf4b58f6eef7",
+        "guide-47fe7d70148cb3db",
+        "sqlite:interactions:27",
+        "sqlite:interactions:28",
+        "sqlite:interactions:29"
+      ]
+    },
+    {
+      "case_id": "boss-blocked",
+      "sources": {
+        "seed": 2,
+        "vector": 3,
+        "sqlite": 3
+      },
+      "ids": [
+        "builtin-combat-survival-001",
+        "builtin-combat-mechanics-001",
+        "guide-f98aa2ce3e038e25",
+        "guide-70cabf4b58f6eef7",
+        "guide-47fe7d70148cb3db",
+        "sqlite:interactions:27",
+        "sqlite:interactions:28",
+        "sqlite:interactions:29"
+      ]
+    }
+  ]
+}

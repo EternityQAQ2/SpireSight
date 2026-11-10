@@ -11,8 +11,6 @@ from sts2_advisor.contracts import (
     Advice, DecisionContext, GameClient, ActionExecutorPort, DecisionRecorder,
     Sts2ApiError, AdvisorBackend, Retriever,
 )
-from sts2_advisor.decision.policy import repair_plan_if_current_action_is_legal
-from sts2_advisor.decision.survival import avoid_proven_death
 from sts2_advisor.recording.logging import get_logger
 from sts2_advisor.game.state import StateBuilder
 from sts2_advisor.decision.plans import ActivePlan
@@ -113,7 +111,9 @@ class AdvisorService:
         observed_id: str | None = None
         observed_count = 0
         error_message: str | None = None
+        failed_decision_id = None
         while True:
+            current_id = None
             try:
                 raw_state = self._read_state()
                 context = self._build_context(raw_state)
@@ -123,13 +123,18 @@ class AdvisorService:
                 else:
                     observed_id = current_id
                     observed_count = 1
-                if context and observed_count >= stable_reads and current_id != self.last_decision_id:
+                if context and observed_count >= stable_reads and current_id != self.last_decision_id and current_id != failed_decision_id:
                     self._process(raw_state, context)
                 error_message = None
             except Sts2ApiError as exc:
                 if str(exc) != error_message:
                     print(f"API 错误：{exc}", file=sys.stderr)
                     error_message = str(exc)
+            except (ValueError, RuntimeError) as exc:
+                failed_decision_id = current_id
+                self.active_plan = None
+                logger.exception('decision_failed_paused decision_id=%s', current_id)
+                self.output(f'当前决策失败，已暂停此局面且未发送动作：{exc}。改变游戏状态或重启程序后可重试。')
             time.sleep(poll_interval)
 
     def _process(self, raw_state: dict, context) -> Advice:
@@ -182,27 +187,29 @@ class AdvisorService:
         record_event("retrieval.result", evidence=[item.to_dict() for item in evidence])
         backend_name = self.backend_name
         try:
-            proposed = self.backend.advise(context, evidence)
-            record_event("decision.proposal", backend=backend_name, advice=proposed.to_dict())
-            proposed, repair_reason = repair_plan_if_current_action_is_legal(proposed, context)
-            if repair_reason is not None:
-                record_event(
-                    "decision.plan_repaired",
-                    reason=repair_reason,
-                    advice=proposed.to_dict(),
-                )
-                logger.warning(
-                    "plan_repaired decision_id=%s candidate_id=%s reason=%s",
-                    context.decision_id, proposed.candidate_id, repair_reason,
-                )
-            advice = validate_advice(proposed, context, evidence)
+            feedback = ''
+            for attempt in range(2):
+                if feedback and hasattr(self.backend, 'advise_with_feedback'):
+                    proposed = self.backend.advise_with_feedback(context, evidence, feedback)
+                else:
+                    proposed = self.backend.advise(context, evidence)
+                record_event("decision.proposal", backend=backend_name, advice=proposed.to_dict())
+                try:
+                    advice = validate_advice(proposed, context, evidence)
+                    break
+                except AdviceValidationError as exc:
+                    feedback = str(exc)
+                    record_event('decision.plan_invalid', reason=str(exc), attempt=attempt + 1)
+                    if attempt:
+                        raise
+                    self.output('模型计划无效，重新请求模型一次。')
         except (AdviceValidationError, ValueError, RuntimeError) as exc:
             record_event("decision.validation_error", error_type=type(exc).__name__, message=str(exc))
             logger.exception(
                 "advisor_fallback backend=%s decision_id=%s error_type=%s",
                 self.backend_name, context.decision_id, type(exc).__name__,
             )
-            if self.fallback_backend is None:
+            if context.decision_type == 'combat_next_action' or isinstance(exc, AdviceValidationError) or self.fallback_backend is None:
                 raise
             backend_name = "rule-fallback"
             record_event("decision.fallback", from_backend=self.backend_name, to_backend=backend_name,
@@ -216,11 +223,6 @@ class AdvisorService:
         return self._deliver(raw_state, context, evidence, advice, backend_name)
 
     def _deliver(self, raw_state, context, evidence, advice, backend_name: str) -> Advice:
-        guarded = avoid_proven_death(advice, context)
-        if guarded is not advice:
-            record_event("decision.survival_override", original=advice.to_dict(), replacement=guarded.to_dict())
-            self.active_plan = None
-            advice = guarded
         rendered = render_console(advice, context, evidence)
         record_event("decision.output", backend=backend_name, advice=advice.to_dict(), rendered=rendered)
         self.output("\n" + rendered + "\n")

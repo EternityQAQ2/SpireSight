@@ -69,23 +69,21 @@ class AttackCalculatorTests(unittest.TestCase):
         self.assertEqual(result["target_hp_after"], 0)
         self.assertEqual(result["hits"], 2)
 
-    def test_automatic_check_retries_false_kill_once(self):
+    def test_model_reason_is_not_automatically_checked_or_rewritten(self):
         ctx = build_decision_context(self.rows["group"])
         requests = []
         def create(**kwargs):
             requests.append(kwargs)
-            payload = {"candidate_id": "card:2:WRIGGLER_3", "reason": "12伤可秒杀18血", "confidence": 0.8}
-            if len(requests) > 1:
-                payload = {"candidate_id": "card:0:WRIGGLER_0", "reason": "调整目标", "confidence": 0.5}
-            return NS(choices=[NS(message=NS(content=json.dumps(payload)), finish_reason="stop")])
+            return NS(choices=[NS(message=NS(content=json.dumps({"candidate_id": "card:2:WRIGGLER_3",
+                "reason": "剥夺配合打击可击杀目标", "confidence": 0.8})), finish_reason="stop")])
         class FakeOpenAI:
             def __init__(self, **kwargs):
                 self.chat = NS(completions=NS(create=create))
         with patch.dict(sys.modules, {"openai": NS(OpenAI=FakeOpenAI)}):
             advice = OpenAIAdvisor("test", api_key="test").advise(ctx, [])
-        self.assertEqual(len(requests), 2)
-        self.assertIn("target_hp_after", requests[1]["messages"][-1]["content"])
-        self.assertEqual(advice.candidate_id, "card:0:WRIGGLER_0")
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(advice.reason, "剥夺配合打击可击杀目标")
+        self.assertEqual(advice.confidence, 0.8)
 
 
 if __name__ == "__main__":

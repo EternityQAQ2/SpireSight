@@ -1,6 +1,6 @@
 # AI 战绩统计
 
-生成时间：2026-11-05 22:18 · 来源 `recordings/trajectories.sqlite3` · advisor 退出时自动更新（也可 `python tools/report_runs.py` 手动重建）
+生成时间：2026-11-09 23:05 · 来源 `recordings/trajectories.sqlite3` · advisor 退出时自动更新（也可 `python tools/report_runs.py` 手动重建）
 
 | # | 日期 | 角色 | 进阶 | 最高层 | 幕 | 结局 | 终局HP | 决策 | 模型调用 | 工具有效/调用 | 计划复用 | 确定性 | Prompt tokens | 命中率 |
 |---|------|------|------|--------|----|------|--------|------|----------|---------------|----------|--------|---------------|--------|
@@ -52,6 +52,7 @@
 | 46 | 2026-11-04 | 铁甲战士 | 0 | 9 | 1 | 死亡 | 0/80 | 125 | 123 | 0/77 | 0 | 44 | 517,317 | 57% |
 | 47 | 2026-11-04 | 铁甲战士 | 0 | 17 | 1 | 死亡 | 0/90 | 179 | 178 | 0/124 | 0 | 67 | 774,379 | 58% |
 | 48 | 2026-11-05 | 铁甲战士 | 0 | 17 | 1 | 死亡 | 0/80 | 195 | 202 | 0/121 | 1 | 61 | 927,168 | 56% |
+| 49 | 2026-11-09 | 铁甲战士 | 0 | 17 | 1 | 中途停止 | 18/80 | 226 | 234 | 0/137 | 1 | 77 | 1,293,189 | 40% |
 
 ## 按角色汇总
 
@@ -60,7 +61,7 @@
 | 亡灵契约师 | 4 | 17 | 11.2 | 0 | 147 | 117,522 |
 | 储君 | 6 | 28 | 15.8 | 0 | 217 | 192,281 |
 | 故障机器人 | 8 | 33 | 17.6 | 0 | 233 | 203,543 |
-| 铁甲战士 | 26 | 43 | 18.3 | 0 | 239 | 358,423 |
+| 铁甲战士 | 27 | 43 | 18.3 | 0 | 239 | 393,044 |
 | 静默猎手 | 4 | 31 | 20.5 | 0 | 340 | 319,742 |
 
 ## 工具试算阻断原因
@@ -70,5 +71,6 @@
 - 第 46 局：未记录具体原因: 77
 - 第 47 局：遗物:STONE_HUMIDIFIER: 124、遗物:BOOK_OF_FIVE_RINGS: 44、敌人状态:SKITTISH: 26、玩家状态:SETUP_STRIKE: 20、敌人状态:RITUAL: 15、玩家状态:VULNERABLE: 15、敌人状态:RAVENOUS: 12、玩家状态:SMOGGY: 7、玩家状态:RETAIN_HAND: 6、玩家状态:WEAK: 4、敌人状态:INTANGIBLE: 3、玩家状态:FRAIL: 2
 - 第 48 局：遗物:KALEIDOSCOPE: 121、遗物:LANTERN: 77、遗物:POTION_BELT: 60、遗物:MEAL_TICKET: 29、敌人状态:SLOW: 23、敌人状态:WEAK: 10、玩家状态:CONSTRICT: 8、敌人状态:INFESTED: 8、敌人状态:SHRINK: 6、玩家状态:SHRINK: 5、玩家状态:CLARITY: 4、玩家状态:FRAIL: 4、玩家状态:WEAK: 4
+- 第 49 局：未支持的影响: 遗物:PHIAL_HOLSTER: 44、未支持的影响: 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 29、未支持的影响: 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST: 16、未支持的影响: 目标状态:SLIPPERY, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST: 13、未支持的影响: 目标状态:INFESTED, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST: 11、未支持的影响: 玩家状态:FREE_ATTACK_POWER, 目标状态:INFESTED, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST: 6、未支持的影响: 玩家状态:SHRINK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 4、未支持的影响: 目标状态:MINION, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 4、未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER: 2、未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST: 2、未支持的影响: 玩家状态:SHRINK_POWER, 玩家状态:FLEX_POTION_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 2、未支持的影响: 玩家状态:SHRINK_POWER, 玩家状态:FLEX_POTION_POWER, 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 2、未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR: 2
 
-共 48 局 · 累计 prompt 13,850,085 tokens。结局判定：hp=0 死亡，hp>0 推断胜利，无 game_over 记录为中途停止。
+共 49 局 · 累计 prompt 15,143,274 tokens。结局判定：hp=0 死亡，hp>0 推断胜利，无 game_over 记录为中途停止。

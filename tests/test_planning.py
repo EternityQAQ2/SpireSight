@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from sts2_advisor.contracts import Advice, Candidate, DecisionContext
@@ -36,11 +37,36 @@ class PlanningTests(unittest.TestCase):
         assert plan is not None
         return plan
 
+    def test_watch_pauses_failed_state_without_repeating_model_requests(self):
+        class Recorder:
+            def record(self, *args): pass
+        service = AdvisorService(None, None, None, Recorder(), backend_name='test', output=lambda x: None)
+        with patch.object(service, '_read_state', return_value=self.raw), \
+             patch.object(service, '_build_context', return_value=self.context), \
+             patch.object(service, '_process', side_effect=ValueError('空内容')) as process, \
+             patch('sts2_advisor.application.advisor.time.sleep', side_effect=[None, None, KeyboardInterrupt]):
+            with self.assertRaises(KeyboardInterrupt):
+                service.watch(0, stable_reads=1)
+        self.assertEqual(process.call_count, 1)
+
     def state_after_first_card(self) -> dict:
         return self.state_after_cards([self.first])
 
     def state_after_cards(self, played_candidates: list[Candidate]) -> dict:
+        from sts2_advisor.game.combat.simulation import initial_state, play
         raw = copy.deepcopy(self.raw)
+        state = initial_state(self.context)
+        for candidate in played_candidates:
+            card = next(c for c in self.context.player['hand'] if c['index'] == candidate.params['card_index'])
+            state = play(state, candidate, card)
+        raw['player']['hp'] = state.hp
+        raw['player']['block'] = state.block
+        for enemy in raw['battle']['enemies']:
+            expected = next(e for e in state.enemies if e.entity_id == enemy['entity_id'])
+            enemy['hp'], enemy['block'] = expected.hp, expected.block
+            enemy['status'] = [s for s in enemy.get('status', []) if s['id'] != 'VULNERABLE_POWER']
+            if expected.vulnerable:
+                enemy['status'].append({'id': 'VULNERABLE_POWER', 'amount': expected.vulnerable})
         played_indices = {item.params["card_index"] for item in played_candidates}
         raw["player"]["hand"] = [
             card for card in raw["player"]["hand"] if card["index"] not in played_indices
@@ -85,6 +111,14 @@ class PlanningTests(unittest.TestCase):
         raw["player"]["hand"][0]["cost"] = "3"
         current = build_decision_context(raw)
         self.assertIsNone(self.make_plan().advance(current))
+
+    def test_unexpected_enemy_hp_or_player_block_invalidates_plan(self):
+        raw = self.state_after_first_card()
+        raw['battle']['enemies'][0]['hp'] += 1
+        self.assertIsNone(self.make_plan().advance(build_decision_context(raw)))
+        raw = self.state_after_first_card()
+        raw['player']['block'] += 1
+        self.assertIsNone(self.make_plan().advance(build_decision_context(raw)))
         raw = self.state_after_first_card()
         raw["player"]["energy"] = 3
         current = build_decision_context(raw)
@@ -235,7 +269,7 @@ class PlanningTests(unittest.TestCase):
         self.assertEqual(backend.calls, 0)
         self.assertTrue(any("仅有一个" in line for line in output))
 
-    def test_service_keeps_legal_action_when_model_plan_is_invalid(self) -> None:
+    def test_service_retries_model_when_plan_is_invalid(self) -> None:
         states = [self.raw]
 
         class Client:
@@ -249,10 +283,12 @@ class PlanningTests(unittest.TestCase):
         first_id = self.first.candidate_id
 
         class Backend:
+            calls = 0
             def advise(self, context, evidence):
+                self.calls += 1
                 return Advice(
                     context.decision_id, first_id, "当前动作合法", 0.8,
-                    plan_candidate_ids=[first_id, "card:not-a-real-action"],
+                    plan_candidate_ids=[first_id, "card:not-a-real-action"] if self.calls == 1 else [first_id],
                 )
 
         class Fallback:
@@ -268,15 +304,43 @@ class PlanningTests(unittest.TestCase):
 
         recorder = Recorder()
         output: list[str] = []
+        backend = Backend()
         service = AdvisorService(
-            Client(), Retriever(), Backend(), recorder,
+            Client(), Retriever(), backend, recorder,
             backend_name="test", fallback_backend=Fallback(), output=output.append,
         )
         self.assertTrue(service.run_once())
         self.assertEqual(recorder.rows[-1][3].candidate_id, first_id)
         self.assertEqual(recorder.rows[-1][3].plan_candidate_ids, [first_id])
-        self.assertEqual(recorder.rows[-1][3].warnings, ["模型后续计划无效，已仅保留当前动作。"])
+        self.assertEqual(backend.calls, 2)
         self.assertFalse(any("改用规则后端" in line for line in output))
+
+    def test_repeated_invalid_plan_never_executes_or_uses_fallback(self):
+        raw = self.raw
+        first_id = self.first.candidate_id
+        class Client:
+            def get_singleplayer_state(self): return raw
+        class Retriever:
+            def retrieve(self, context, top_k=6): return []
+        class Backend:
+            calls = 0
+            def advise(self, context, evidence):
+                self.calls += 1
+                return Advice(context.decision_id, first_id, '测试', 0.8,
+                              plan_candidate_ids=[first_id, 'invalid'])
+        class Fallback:
+            def advise(self, context, evidence): raise AssertionError('不应使用规则回退')
+        class Executor:
+            def execute(self, *args): raise AssertionError('不应执行无效计划')
+        class Recorder:
+            def record(self, *args): pass
+        backend = Backend()
+        service = AdvisorService(Client(), Retriever(), backend, Recorder(),
+                                 backend_name='test', fallback_backend=Fallback(),
+                                 action_executor=Executor(), output=lambda x: None)
+        with self.assertRaises(AdviceValidationError):
+            service.run_once()
+        self.assertEqual(backend.calls, 2)
 
     def test_shop_plan_requires_expected_purchase_and_gold_change(self) -> None:
         first = Candidate("shop:0", "shop_purchase", "卡牌甲", {"index": 0})

@@ -12,6 +12,36 @@ from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.lexical import NullRetriever
 
 
+def interaction_mentions(context: DecisionContext, fact_names: set[str]) -> tuple[str, list[str]]:
+    """Match full entity names separately from references in descriptive text.
+
+    A card named 岿然不动 is not evidence of the unrelated 不动 power. Mask
+    observed names longest-first before looking for descriptive references;
+    keep exact names (and upgraded-card base names) available for direct lookup.
+    """
+    names = set(fact_names)
+
+    def collect(value):
+        if isinstance(value, dict):
+            for key in ('name', 'event_name'):
+                name = value.get(key)
+                if isinstance(name, str) and name:
+                    names.add(name)
+            for item in value.values():
+                collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+
+    value = context.to_dict()
+    collect(value)
+    names.update(name[:-1] for name in list(names) if name.endswith('+'))
+    query = json.dumps(value, ensure_ascii=False)
+    for name in sorted(names, key=len, reverse=True):
+        query = query.replace(name, ' ')
+    return query, sorted(names)
+
+
 class SqliteFactsRetriever:
     """按局面中的实体 ID/名称只读查询事实与效果交互，并保留已有攻略。"""
 
@@ -94,15 +124,17 @@ class SqliteFactsRetriever:
                         f"sqlite:{table}:{row['id']}", text, f"灰机 Wiki：{row['name']}",
                         metadata={"table": table},
                     ))
-            # 交互说明的关联页面可出现在名称、卡牌说明或状态说明中。
-            query = json.dumps(context.to_dict(), ensure_ascii=False) + " " + " ".join(sorted(names))
+            # 完整实体名称精确匹配；说明中的效果引用另行匹配，避免短名撞长名。
+            query, interaction_names = interaction_mentions(context, names)
+            page_slots = ','.join('?' for _ in interaction_names) or 'NULL'
             rows = connection.execute(
                 "SELECT DISTINCT i.id, i.description FROM interactions i "
                 "JOIN interaction_pages p ON p.interaction_id = i.id "
-                "WHERE instr(?, p.page_name) > 0 ORDER BY i.id LIMIT ?", (query, top_k),
+                f"WHERE p.page_name IN ({page_slots}) OR instr(?, p.page_name) > 0 "
+                "ORDER BY i.id LIMIT ?", (*interaction_names, query, top_k),
             ).fetchall()
             record_event("retrieval.rows", provider="sqlite", table="interactions", query=query,
-                         rows=[dict(row) for row in rows])
+                         names=interaction_names, rows=[dict(row) for row in rows])
             interactions = [Evidence(
                 f"sqlite:interactions:{row['id']}", row["description"], "灰机 Wiki：效果交互",
                 metadata={"table": "interactions"},

@@ -1446,6 +1446,54 @@
       "tool_followup_calls": 69,
       "tool_followup_prompt_tokens": 355464,
       "outcome": "death"
+    },
+    {
+      "character": "铁甲战士",
+      "started_at": "2026-11-09T13:23:00.624161+00:00",
+      "ended_at": "2026-11-09T14:48:24.576261+00:00",
+      "max_floor": 17,
+      "max_act": 1,
+      "ascension": 0,
+      "final_hp": 18,
+      "max_hp": 80,
+      "game_over_observed": false,
+      "session_ids": [
+        "31e3a8ca-74dd-44d2-a5bd-c4c86208a5bf",
+        "3342e2bf-4aba-49aa-9339-eca92f35a22d",
+        "3c2bec0f-e013-4e5a-b5d8-24f093a09976",
+        "1ba2b086-5838-42ed-abe0-95fe72c345f6",
+        "136a52c6-856d-419d-bb46-ac989b2c1aab",
+        "fa9d524d-33ca-4411-8b8c-5907496102eb"
+      ],
+      "decisions": 226,
+      "deterministic": 77,
+      "plan_reuses": 1,
+      "model_calls": 234,
+      "tool_calls": 137,
+      "prompt_tokens": 1293189,
+      "cache_hit_tokens": 511616,
+      "cache_hit_rate": 0.396,
+      "tool_exact": 0,
+      "tool_errors": 0,
+      "tool_blockers": {
+        "未支持的影响: 遗物:PHIAL_HOLSTER": 44,
+        "未支持的影响: 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 29,
+        "未支持的影响: 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST": 16,
+        "未支持的影响: 目标状态:SLIPPERY, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST": 13,
+        "未支持的影响: 目标状态:INFESTED, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST": 11,
+        "未支持的影响: 玩家状态:FREE_ATTACK_POWER, 目标状态:INFESTED, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST": 6,
+        "未支持的影响: 玩家状态:SHRINK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 4,
+        "未支持的影响: 目标状态:MINION, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 4,
+        "未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER": 2,
+        "未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST": 2,
+        "未支持的影响: 玩家状态:SHRINK_POWER, 玩家状态:FLEX_POTION_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 2,
+        "未支持的影响: 玩家状态:SHRINK_POWER, 玩家状态:FLEX_POTION_POWER, 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 2,
+        "未支持的影响: 玩家状态:FREE_ATTACK_POWER, 遗物:PHIAL_HOLSTER, 遗物:PERMAFROST, 遗物:STONE_CALENDAR": 2
+      },
+      "tool_undetailed": 0,
+      "tool_followup_calls": 80,
+      "tool_followup_prompt_tokens": 543148,
+      "outcome": "aborted"
     }
   ]
 }

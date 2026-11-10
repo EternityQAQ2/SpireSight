@@ -136,6 +136,34 @@ class SqliteRetrievalTests(unittest.TestCase):
         ids = {item.evidence_id for item in SqliteFactsRetriever(self.db).retrieve(context, 20)}
         self.assertNotIn("sqlite:cards:pile_only", ids)
 
+    def test_long_card_name_does_not_match_unrelated_short_power_name(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO interactions(id,description,description_wiki) VALUES (2,'不动翻倍格挡','raw')")
+            connection.execute("INSERT INTO interaction_pages VALUES (2,'不动')")
+            connection.execute("INSERT INTO interactions(id,description,description_wiki) VALUES (3,'岿然不动相关交互','raw')")
+            connection.execute("INSERT INTO interaction_pages VALUES (3,'岿然不动')")
+        self.raw['player']['draw_pile'] = [
+            {'name': '岿然不动+', 'cost': '2', 'description': '获得40点格挡。 消耗。'},
+        ]
+        context = build_decision_context(self.raw)
+        ids = {e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(context, 20)}
+        self.assertNotIn('sqlite:interactions:2', ids)
+        self.assertIn('sqlite:interactions:3', ids)
+
+    def test_explicit_power_and_description_reference_still_match_interactions(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO interactions(id,description,description_wiki) VALUES (2,'不动翻倍格挡','raw')")
+            connection.execute("INSERT INTO interaction_pages VALUES (2,'不动')")
+        for status in [
+            {'id': 'UNMOVING', 'name': '不动', 'amount': 1},
+            {'id': 'OTHER', 'name': '另一状态', 'description': '在回合开始获得不动。'},
+        ]:
+            with self.subTest(status=status):
+                self.raw['player']['status'] = [status]
+                context = build_decision_context(self.raw)
+                ids = {e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(context, 20)}
+                self.assertIn('sqlite:interactions:2', ids)
+
     def test_auto_combines_sqlite_facts_with_existing_guides_and_respects_top_k(self):
         with patch("sts2_advisor.integrations.knowledge.factory.ChromaRetriever", side_effect=RuntimeError("not installed")):
             retriever = create_retriever("auto", self.root / "chroma", self.knowledge,

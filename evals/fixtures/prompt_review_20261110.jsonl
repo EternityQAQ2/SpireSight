@@ -1,0 +1,16 @@
+{"case_id":"debuff-order","variant":"current","status":"clear_error","notes":"原始计划是2费痛击加1费打击，共17伤；理由却按痛击加两打击算26伤，相当于4费。战栗加两打击应为18而非24。不能把这题当作完整方案比较正确。"}
+{"case_id":"debuff-order","variant":"compact","status":"incomplete_comparison","notes":"选择痛击可执行，未给出完整备选比较；不能据此证明优于战栗加两打击。"}
+{"case_id":"partial-block","variant":"current","status":"tradeoff_unjustified","notes":"工具正确核对16伤、10伤，模型也承认防御省5血；仍选剑柄但没有证明输出能避免后续更多损失。不能直接判定攻击在全局上必错。"}
+{"case_id":"partial-block","variant":"compact","status":"tradeoff_unjustified","notes":"工具正确核对伤害；以5格挡挡不住23解释收益低，未说明为何值得额外掉5血。攻击不直接判为全局错误。"}
+{"case_id":"four-enemies","variant":"current","status":"clear_error","notes":"三张攻击的原始目标都是18血强化虫；剥夺12加双重14后已死亡，后续打击不能再打同一目标。理由说重创另一只与计划不一致。另有感染3伤。程序会先截断计划，不表示实战会执行完此错误序列。"}
+{"case_id":"four-enemies","variant":"compact","status":"clear_error","notes":"明确声称12伤击杀18血；原始计划12打18、14打19、8打21，实际未击杀任何一只。已知存在集中击杀攻击虫的可行组合。"}
+{"case_id":"reward-exhaust","variant":"current","status":"debatable","notes":"选择恶魔之焰不直接判错；理由偏重稀有流派核心，对快照不完整、当前缺口和手牌消耗代价的权衡不足。"}
+{"case_id":"reward-exhaust","variant":"compact","status":"debatable","notes":"铁斩波补防御的理由更具体，但快照不完整，不能证明长期优于恶魔之焰。"}
+{"case_id":"zero-cost-kill","variant":"current","status":"acceptable","notes":"0能量仍使用0费10伤打击击杀8血攻击甲虫，符合当前显示值，避免7攻击。"}
+{"case_id":"zero-cost-kill","variant":"compact","status":"acceptable_with_warning","notes":"第一动作正确；工具因未支持状态/遗物返回未知。警告又怀疑已显示的伤害可能未计缩小，和输入数值优先原则不一致。"}
+{"case_id":"cheap-lethal","variant":"current","status":"clear_error","notes":"痛击加愤怒已可结束战斗，原始计划还对同一目标打击；理由简单相加34也未按易伤逐步结算。第一张痛击本身可执行。"}
+{"case_id":"cheap-lethal","variant":"compact","status":"clear_error","notes":"痛击加愤怒已杀死最后敌人，原始计划仍安排防御；警告称加力量推算，与已含力量的显示值优先规则矛盾。第一动作仍可执行。"}
+{"case_id":"boss-opening","variant":"current","status":"clear_error","notes":"坚毅7加触发后的邪眼16应合计23盾，不是16；随机消耗后不能保证邪眼和武装仍在。3费预算本身可支付，但原始整段计划不能确定执行。"}
+{"case_id":"boss-opening","variant":"compact","status":"clear_error","notes":"原始计划含邪眼、坚毅、防御、武装四张1费牌，超过3能量；理由还声称前三张后剩1费。第一张0费愤怒可执行，程序会重观察，不代表四费实际被发送。"}
+{"case_id":"reward-defense","variant":"current","status":"debatable","notes":"选择挑衅有低费攻防理由；与30盾收益的比较不足，但不能把不同选牌直接算错。输入此时含三条由不动误匹配引入的无关交互。"}
+{"case_id":"reward-defense","variant":"compact","status":"debatable","notes":"选择岿然不动补高额格挡有依据；消耗属性可循环的说法缺少回收条件，不能当作普通重抽。快照不完整，未证明此选牌最优。"}

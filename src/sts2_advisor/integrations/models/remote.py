@@ -2,19 +2,15 @@
 from __future__ import annotations
 
 import json
-import re
-from dataclasses import replace
 from sts2_advisor.contracts import Advice, DecisionContext, Evidence
-from sts2_advisor.decision.prompts import SYSTEM_PROMPT, build_prompt
+from sts2_advisor.decision.prompts import build_system_prompt, build_prompt
 from sts2_advisor.decision.context import CodexCache
 from sts2_advisor.decision.tools import DecisionTools, TOOL_SCHEMAS
-from sts2_advisor.game.combat.calculator import calculate
 from sts2_advisor.decision.parsing import extract_json_object, advice_from_payload
 from sts2_advisor.recording.logging import get_logger
 from sts2_advisor.recording.trajectory import record_event, recorded_call
 
 logger = get_logger("model")
-KILL_CLAIM = re.compile(r"(?<!不)(?<!未)(?<!无)(?<!法)(?:秒杀|斩杀|可击杀)")
 
 
 class OpenAIAdvisor:
@@ -30,6 +26,8 @@ class OpenAIAdvisor:
         max_tokens: int = 1024,
         json_mode: bool = True,
         thinking: str | None = None,
+        adaptive_thinking: bool = False,
+        reasoning_effort: str | None = None,
         function_calling: bool = True,
     ) -> None:
         if not api_key:
@@ -48,12 +46,27 @@ class OpenAIAdvisor:
         self.max_tokens = max_tokens
         self.json_mode = json_mode
         self.thinking = thinking
+        self.adaptive_thinking = adaptive_thinking
+        self.reasoning_effort = reasoning_effort or ('low' if base_url and 'deepseek.com' in base_url.lower() else None)
+        if self.reasoning_effort not in {None, 'low', 'high', 'max'}:
+            raise ValueError('reasoning_effort 必须为 low、high 或 max')
         self.function_calling = function_calling
 
-    def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice:
+    def advise_with_feedback(self, context: DecisionContext, evidence: list[Evidence], feedback: str) -> Advice:
+        return self.advise(context, evidence, feedback=feedback)
+
+    def advise(self, context: DecisionContext, evidence: list[Evidence], *, feedback: str = '') -> Advice:
+        enemies = (context.situation.get('battle') or {}).get('enemies', [])
+        difficult = (context.decision_type == 'combat_next_action' and
+                     (context.state_type in {'elite', 'boss'} or
+                      sum(1 for enemy in enemies if (enemy.get('hp') or 0) > 0) > 1))
+        thinking = ('enabled' if difficult else 'disabled') if self.adaptive_thinking else self.thinking
+        max_tokens = max(self.max_tokens, 16384) if thinking == 'enabled' else self.max_tokens
         prompt = build_prompt(context, evidence, codex_cache=self.codex_cache)
+        if feedback:
+            prompt += '\n上次计划无法执行：' + feedback + '。请重新选择合法计划。'
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": build_system_prompt()},
             {"role": "user", "content": prompt},
         ]
         tools_enabled = self.function_calling and context.decision_type == "combat_next_action"
@@ -61,44 +74,32 @@ class OpenAIAdvisor:
             messages[0]["content"] += (
                 "\n可调用 calculate_attack 核对单张攻击牌，传入预期目标剩余生命；目标修正由工具读取。"
                 "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
-                "出现不一致时根据工具结果重新决策一次；最后返回要求的建议 JSON。"
+                "由你结合工具结果选择行动；最后返回要求的建议 JSON。"
             )
         logger.info(
             "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
-            "json_mode=%s thinking=%s max_tokens=%s",
+            "json_mode=%s thinking=%s max_tokens=%s reasoning_effort=%s",
             self.model_name, context.decision_id, len(prompt), len(evidence),
-            self.json_mode, self.thinking, self.max_tokens,
+            self.json_mode, thinking, max_tokens, self.reasoning_effort if thinking == 'enabled' else None,
         )
         try:
             dispatcher = DecisionTools(context)
             calls_used = 0
-            tool_results = []
+            length_retry_used = False
             for round_index in range(2):
                 options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index == 0 and calls_used < 8 else "none"} if tools_enabled else {}
+                options['thinking'] = thinking
                 content, reasoning, finish_reason, assistant = self._complete(
-                    messages, self.max_tokens, context.decision_id, **options)
+                    messages, max_tokens, context.decision_id, **options)
                 tool_calls = assistant.get("tool_calls") or []
                 if not tool_calls:
-                    if not content and finish_reason == "length" and self.max_tokens < 4096:
+                    if not content and finish_reason == "length" and max_tokens < 8192 and not length_retry_used:
+                        length_retry_used = True
                         content, reasoning, finish_reason, assistant = self._complete(
-                            messages, min(max(self.max_tokens * 2, 2048), 4096),
+                            messages, min(max(max_tokens * 2, 2048), 8192),
                             context.decision_id, **options)
                         tool_calls = assistant.get("tool_calls") or []
                     if not tool_calls:
-                        if tools_enabled and round_index == 0 and content:
-                            provisional = advice_from_payload(extract_json_object(content), context)
-                            if KILL_CLAIM.search(provisional.reason):
-                                candidate = next((c for c in context.candidates if c.candidate_id == provisional.candidate_id), None)
-                                enemy = next((e for e in (context.situation.get("battle") or {}).get("enemies", [])
-                                              if candidate and e.get("entity_id") == candidate.params.get("target")), None)
-                                if enemy:
-                                    check = calculate(context, provisional.candidate_id, 0)
-                                    record_event("decision.attack_check", decision_id=context.decision_id, result=check)
-                                    tool_results.append(check)
-                                    if check.get("status") == "calculated" and not check.get("matches"):
-                                        messages.append({"role": "assistant", "content": content})
-                                        messages.append({"role": "user", "content": "你的击杀判断与计算结果矛盾。请重新选择一次并返回最终 JSON：" + json.dumps(check, ensure_ascii=False)})
-                                        continue
                         break
                 if not tools_enabled or round_index == 1 or len(tool_calls) > 8:
                     raise ValueError("模型超出工具调用轮数或批量上限")
@@ -108,7 +109,6 @@ class OpenAIAdvisor:
                     result = ({"ok": False, "error": "工具预算已耗尽，请返回最终建议"} if calls_used >= 8 else
                               dispatcher.call(function.get("name", ""), function.get("arguments", "")))
                     calls_used += 1
-                    tool_results.append(result)
                     record_event("model.tool_result", decision_id=context.decision_id,
                                  tool_call_id=call["id"], name=function.get("name"), arguments=function.get("arguments"), result=result)
                     messages.append({"role": "tool", "tool_call_id": call["id"],
@@ -128,35 +128,12 @@ class OpenAIAdvisor:
             if reasoning:
                 detail = "；服务只返回了 reasoning_content，可能是输出上限过小或模型接口不兼容"
             raise ValueError(f"远程模型返回了空内容{detail}，请查看运行日志")
-        advice = advice_from_payload(extract_json_object(content), context)
-        if tool_results and all("status" not in r for r in tool_results):
-            chosen = dispatcher.evaluate(advice.plan_candidate_ids or [advice.candidate_id])
-            claim = re.search(r"秒杀|斩杀|可击杀|仅\d+点伤害|只受\d+点伤害", advice.reason)
-            contradicted = bool(chosen.get("exact") and chosen.get("projection") and
-                                chosen["projection"]["kills"] == 0 and
-                                re.search(r"秒杀|斩杀|可击杀", advice.reason))
-            if claim and (not chosen.get("exact") or contradicted):
-                advice = replace(advice, reason="试算结果不支持原定斩杀判断；先执行一步并重新观测。" if contradicted else
-                                 "当前机制无法完整试算；先执行一步并重新观测。",
-                                 confidence=min(advice.confidence, 0.4),
-                                 warnings=advice.warnings + ["计划试算不支持或与斩杀断言矛盾，原理由中的确定性判断已撤回"])
-        selected = next((r for r in tool_results if r.get("candidate_id") == advice.candidate_id and r.get("status") == "calculated"), None)
-        if tools_enabled and KILL_CLAIM.search(advice.reason) and not selected:
-            candidate = next((c for c in context.candidates if c.candidate_id == advice.candidate_id), None)
-            enemy = next((e for e in (context.situation.get("battle") or {}).get("enemies", [])
-                          if candidate and e.get("entity_id") == candidate.params.get("target")), None)
-            if enemy:
-                selected = calculate(context, advice.candidate_id, 0)
-                record_event("decision.attack_check", decision_id=context.decision_id, result=selected)
-        if selected and selected.get("status") == "calculated" and not selected["target_defeated"] and KILL_CLAIM.search(advice.reason):
-            advice = replace(advice, reason="计算结果显示目标仍有生命，先执行一步并重新观测。",
-                             confidence=min(advice.confidence, 0.4),
-                             warnings=advice.warnings + ["攻击计算结果与击杀断言矛盾"])
-        return advice
+        return advice_from_payload(extract_json_object(content), context)
 
     def _complete(
         self, messages: list[dict], max_tokens: int, decision_id: str,
         *, tools: list[dict] | None = None, tool_choice: str = "auto",
+        thinking: str | None = None,
     ) -> tuple[str, str, str | None, dict]:
         request = {
             "model": self.model_name,
@@ -168,8 +145,10 @@ class OpenAIAdvisor:
             request.update(tools=tools, tool_choice=tool_choice)
         if self.json_mode:
             request["response_format"] = {"type": "json_object"}
-        if self.thinking in {"enabled", "disabled"}:
-            request["extra_body"] = {"thinking": {"type": self.thinking}}
+        if thinking in {"enabled", "disabled"}:
+            request["extra_body"] = {"thinking": {"type": thinking}}
+        if thinking == 'enabled' and self.reasoning_effort:
+            request['reasoning_effort'] = self.reasoning_effort
         with recorded_call("model", backend="openai", request=request) as call_id:
             response = self.client.chat.completions.create(**request)
             record_event("model.raw_response", call_id=call_id,

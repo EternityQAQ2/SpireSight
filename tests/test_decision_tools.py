@@ -102,7 +102,7 @@ class DecisionToolTests(unittest.TestCase):
         self.assertEqual(messages[-1]["tool_call_id"], "call-1")
         self.assertTrue(json.loads(messages[-1]["content"])["exact"])
 
-    def test_tool_result_overrules_false_kill_claim(self):
+    def test_tool_result_does_not_rewrite_model_claim(self):
         def create(**kwargs):
             if len(kwargs["messages"]) == 2:
                 return self.response(tool=True)
@@ -110,8 +110,8 @@ class DecisionToolTests(unittest.TestCase):
                 "candidate_id": "card:2", "reason": "此牌可击杀敌人", "confidence": 0.9,
             })), finish_reason="stop")])
         advice = self.backend(create).advise(self.ctx, [])
-        self.assertNotIn("可击杀", advice.reason)
-        self.assertLessEqual(advice.confidence, 0.4)
+        self.assertEqual(advice.reason, "此牌可击杀敌人")
+        self.assertEqual(advice.confidence, 0.9)
 
     def test_endless_tool_calls_are_bounded(self):
         requests = []
@@ -130,6 +130,58 @@ class DecisionToolTests(unittest.TestCase):
             return self.response()
         self.backend(create, function_calling=False).advise(self.ctx, [])
         self.assertNotIn("tools", requests[0])
+
+    def test_adaptive_thinking_is_selected_per_decision(self):
+        from dataclasses import replace
+        requests = []
+        def create(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            return self.response()
+        backend = self.backend(create, adaptive_thinking=True, thinking='disabled')
+        single = copy.deepcopy(self.ctx.situation)
+        single['battle']['enemies'] = single['battle']['enemies'][:1]
+        ordinary = replace(self.ctx, state_type='monster', situation=single)
+        multiple = copy.deepcopy(single)
+        multiple['battle']['enemies'].append(dict(multiple['battle']['enemies'][0], entity_id='other'))
+        for ctx in [replace(ordinary, state_type='elite'), ordinary,
+                    replace(ordinary, situation=multiple), replace(ordinary, state_type='boss'),
+                    replace(ordinary, decision_type='map')]:
+            backend.advise(ctx, [])
+        self.assertEqual([r['extra_body']['thinking']['type'] for r in requests],
+                         ['enabled', 'disabled', 'enabled', 'enabled', 'disabled'])
+        self.assertEqual([r['max_tokens'] for r in requests], [16384, 1024, 16384, 16384, 1024])
+        self.assertEqual(backend.thinking, 'disabled')
+
+    def test_truncated_normal_request_retries_once_with_more_output(self):
+        from dataclasses import replace
+        requests = []
+        def create(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            if len(requests) == 1:
+                return NS(choices=[NS(message=NS(content='', reasoning_content='思考中'), finish_reason='length')])
+            return self.response()
+        backend = self.backend(create, thinking='disabled', max_tokens=4096)
+        advice = backend.advise(replace(self.ctx, state_type='elite'), [])
+        self.assertEqual(advice.candidate_id, 'card:2')
+        self.assertEqual([r['max_tokens'] for r in requests], [4096, 8192])
+        self.assertEqual([r['extra_body']['thinking']['type'] for r in requests], ['disabled', 'disabled'])
+
+    def test_deepseek_uses_low_effort_only_when_thinking_enabled(self):
+        from dataclasses import replace
+        requests = []
+        def create(**kwargs):
+            requests.append(copy.deepcopy(kwargs))
+            return self.response()
+        backend = self.backend(create, adaptive_thinking=True)
+        # The fixture helper uses a generic endpoint; use the DeepSeek constructor default.
+        class FakeOpenAI:
+            def __init__(self, **kwargs): self.chat = NS(completions=NS(create=create))
+        with patch.dict(sys.modules, {'openai': NS(OpenAI=FakeOpenAI)}):
+            backend = OpenAIAdvisor('deepseek-flash', api_key='test', base_url='https://api.deepseek.com', adaptive_thinking=True)
+        backend.advise(replace(self.ctx, state_type='elite'), [])
+        backend.advise(replace(self.ctx, decision_type='map'), [])
+        self.assertEqual(requests[0]['reasoning_effort'], 'low')
+        self.assertNotIn('reasoning_effort', requests[1])
 
 
 if __name__ == "__main__":
