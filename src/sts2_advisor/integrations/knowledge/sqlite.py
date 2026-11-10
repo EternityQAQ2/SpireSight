@@ -10,6 +10,7 @@ from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.contracts import Retriever
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.lexical import NullRetriever
+from sts2_advisor.integrations.knowledge.relevance import entity_name, rank_facts
 
 
 def interaction_mentions(context: DecisionContext, fact_names: set[str]) -> tuple[str, list[str]]:
@@ -23,10 +24,9 @@ def interaction_mentions(context: DecisionContext, fact_names: set[str]) -> tupl
 
     def collect(value):
         if isinstance(value, dict):
-            for key in ('name', 'event_name'):
-                name = value.get(key)
-                if isinstance(name, str) and name:
-                    names.add(name)
+            name = entity_name(value)
+            if name:
+                names.add(name)
             for item in value.values():
                 collect(item)
         elif isinstance(value, list):
@@ -63,10 +63,11 @@ class SqliteFactsRetriever:
         def collect(value):
             if isinstance(value, dict):
                 entity_id = (
-                    value.get("id") or value.get("event_id")
+                    value.get("id") or value.get("event_id") or value.get('card_id')
+                    or value.get('relic_id') or value.get('potion_id')
                     or re.sub(r"_\d+$", "", str(value.get("entity_id", "")))
                 )
-                name = value.get("name") or value.get("event_name")
+                name = entity_name(value)
                 upgraded = value.get("is_upgraded", False)
                 if isinstance(entity_id, str) and entity_id:
                     entity_id = entity_id.lower()
@@ -122,25 +123,34 @@ class SqliteFactsRetriever:
                     }, ensure_ascii=False)
                     facts.append(Evidence(
                         f"sqlite:{table}:{row['id']}", text, f"灰机 Wiki：{row['name']}",
-                        metadata={"table": table},
+                        metadata={"table": table, "name": row["name"], 'entity_id': row['id'],
+                                  "description": row["description"] if "description" in row.keys() else ""},
                     ))
             # 完整实体名称精确匹配；说明中的效果引用另行匹配，避免短名撞长名。
             query, interaction_names = interaction_mentions(context, names)
             page_slots = ','.join('?' for _ in interaction_names) or 'NULL'
             rows = connection.execute(
-                "SELECT DISTINCT i.id, i.description FROM interactions i "
+                "SELECT i.id, i.description, p.page_name FROM interactions i "
                 "JOIN interaction_pages p ON p.interaction_id = i.id "
                 f"WHERE p.page_name IN ({page_slots}) OR instr(?, p.page_name) > 0 "
-                "ORDER BY i.id LIMIT ?", (*interaction_names, query, top_k),
+                "ORDER BY i.id, p.page_name", (*interaction_names, query),
             ).fetchall()
             record_event("retrieval.rows", provider="sqlite", table="interactions", query=query,
                          names=interaction_names, rows=[dict(row) for row in rows])
+            grouped = {}
+            for row in rows:
+                item = grouped.setdefault(row['id'], {'description': row['description'], 'pages': []})
+                item['pages'].append(row['page_name'])
             interactions = [Evidence(
                 f"sqlite:interactions:{row['id']}", row["description"], "灰机 Wiki：效果交互",
-                metadata={"table": "interactions"},
-            ) for row in rows]
+                metadata={"table": "interactions", "pages": row['pages']},
+            ) for row in ({'id': key, **value} for key, value in grouped.items())]
 
-        facts = interactions + facts
+        facts = rank_facts(context, interactions + facts)
+        record_event('retrieval.ranked', provider='sqlite', hits=[
+            {'id': e.evidence_id, 'priority': e.metadata['priority'], 'reason': e.metadata['relevance']}
+            for e in facts])
         guides = self.fallback.retrieve(context, top_k)
         guide_count = min(len(guides), top_k // 2) if facts else len(guides)
-        return (guides[:guide_count] + facts + guides[guide_count:])[:top_k]
+        fact_count = top_k - guide_count
+        return (facts[:fact_count] + guides[:guide_count] + facts[fact_count:] + guides[guide_count:])[:top_k]

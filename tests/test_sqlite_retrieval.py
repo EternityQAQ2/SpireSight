@@ -189,6 +189,59 @@ class SqliteRetrievalTests(unittest.TestCase):
                                              facts_path=self.db, seeds_path=self.seeds)
                 self.assertEqual([item.evidence_id for item in retriever.retrieve(self.context)], expected)
 
+    def test_active_power_and_enemy_outrank_pickup_only_relics(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO powers(id,name,description) VALUES ('vulnerable','易伤','受到攻击伤害增加50%。')")
+            connection.execute("INSERT INTO monsters(id,name,powers) VALUES ('nibbit','小啃兽','当前敌人的机制。')")
+            for index in range(4):
+                connection.execute('INSERT INTO relics(id,name,description) VALUES (?,?,?)',
+                                   (f'pickup{index}', f'开局遗物{index}', '拾起时，获得金币。'))
+        self.raw['player']['relics'] = [{'id': f'PICKUP{i}', 'name': f'开局遗物{i}'} for i in range(4)]
+        self.raw['player']['status'] = [{'id': 'VULNERABLE', 'name': '易伤', 'amount': 1}]
+        ctx = build_decision_context(self.raw)
+        ids = [e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(ctx, 2)]
+        self.assertEqual(ids, ['sqlite:powers:vulnerable', 'sqlite:monsters:nibbit'])
+
+    def test_reward_card_fact_outranks_generic_relic_interaction(self):
+        raw = {'state_type': 'card_reward', 'run': {}, 'player': self.raw['player'],
+               'card_reward': {'cards': [{'id': 'strike_ironclad', 'name': '打击', 'index': 0}]}}
+        ctx = build_decision_context(raw)
+        ids = [e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(ctx, 1)]
+        self.assertEqual(ids, ['sqlite:cards:strike_ironclad'])
+
+    def test_active_interaction_not_lost_to_low_id_interactions_before_ranking(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO powers(id,name,description) VALUES ('vulnerable','易伤','受到攻击伤害增加50%。')")
+            connection.execute("INSERT INTO interactions(id,description,description_wiki) VALUES (2,'无关牌的说明','raw')")
+            connection.execute("INSERT INTO interaction_pages VALUES (2,'其他牌')")
+            connection.execute("INSERT INTO interactions(id,description,description_wiki) VALUES (50,'当前易伤的交互','raw')")
+            connection.execute("INSERT INTO interaction_pages VALUES (50,'易伤')")
+        self.raw['player']['draw_pile'] = [{'name': '其他牌'}]
+        self.raw['player']['status'] = [{'id': 'VULNERABLE', 'name': '易伤', 'amount': 1}]
+        ctx = build_decision_context(self.raw)
+        ids = [e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(ctx, 2)]
+        self.assertEqual(ids, ['sqlite:powers:vulnerable', 'sqlite:interactions:50'])
+
+    def test_shop_card_id_and_name_are_collected_as_current_candidates(self):
+        from dataclasses import replace
+        ctx = replace(self.context, player={**self.context.player, 'hand': []},
+                      decision_type='shop', state_type='shop', situation={
+            'shop': {'items': [{'card_id': 'strike_ironclad', 'card_name': '打击', 'category': 'card'}]},
+        })
+        ids = [e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(ctx, 1)]
+        self.assertEqual(ids, ['sqlite:cards:strike_ironclad'])
+
+    def test_unused_potion_effect_is_not_ranked_as_an_active_power(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO powers(id,name,description) VALUES ('flex_potion','肌肉药水','药水带来的状态。')")
+            connection.execute("INSERT INTO powers(id,name,description) VALUES ('vulnerable','易伤','增加伤害。')")
+            connection.execute("INSERT INTO monsters(id,name) VALUES ('nibbit','小啃兽')")
+        self.raw['player']['potions'] = [{'id': 'FLEX_POTION', 'name': '肌肉药水'}]
+        self.raw['player']['status'] = [{'id': 'VULNERABLE', 'name': '易伤', 'amount': 1}]
+        ctx = build_decision_context(self.raw)
+        ids = [e.evidence_id for e in SqliteFactsRetriever(self.db).retrieve(ctx, 2)]
+        self.assertEqual(ids, ['sqlite:powers:vulnerable', 'sqlite:monsters:nibbit'])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,8 @@
 
 结果、限制和已修复的SQLite名称误匹配详见 [实验报告](../docs/prompt-evaluation-20261110.md)。这组实验没有证明精简提示词提高决策质量，因此未切换线上默认。更新基准请将 `--prepare --fixtures` 指向新文件，保留旧输入便于比较。
 
+检索本身的前后对照使用 `python -m evals.compare_retrieval --baseline 932eb58 --output tmp/retrieval-new.json`。它只查询本地SQLite、Chroma和seed，不调用决策API；默认20局面、每版本重复3次，保留逐题证据及耗时。已应用的事实排序和场景查询见 [检索改进报告](../docs/retrieval-relevance-20261110.md)。
+
 `fixtures/log_cases.jsonl` 冻结了 2026-11-03 最近一局中的三个真实局面：三能量五费连招、缺少持牌清单的选牌、包含全身撞击和铁斩波的战斗。每行保留来源会话、步骤与事件序号，运行时不读取会变化的轨迹数据库。
 
 不调用模型或游戏的基线分析：
