@@ -8,8 +8,18 @@
 | evals.compare_retrieval | Git基线与当前真实检索对照 | 本地SQLite/Chroma/seed，不调用决策API |
 | evals.replay_retrieval_decisions | 相同提示、不同冻结证据的8组重放 | 离线；--run才付费，32请求/16万token |
 | evals.compare_decision_options | 工具、摘要与Pro四组对照 | 离线；--run才付费，64请求/36万token |
+| evals.compare_attack_delivery | 真实应用流程，工具往返 vs 首轮攻击结果 | 离线；--prepare冻结本地检索，--run为6题×2配置×2次，最多48请求/20万token |
 
-付费脚本必须用新输出路径，不覆盖原始结果。历史实验使用1600输出上限和top_k=6；线上战斗目前最多4条证据，本机输出配置1024，不要当成完全相同的线上回放。新轮实验先对齐准备路径与参数。实验seed不会覆盖生产seed。
+付费脚本必须用新输出路径，不覆盖原始结果。历史实验使用1600输出上限和top_k=6；线上战斗目前top_k最多4，另加不占名额的固定seed，本机输出配置1024。`compare_attack_delivery`复用CLI配置工厂和AdvisorService的检索、校验、一次重决策与只读交付，保留原始提案及校验后前缀；恢复已录制的观测上下文，不重新猜测历史牌组。这是隔离局面的回放，不检验连续计划复用或平均楼层。其他旧实验不等于完整线上回放。
+
+新6题固定在 `fixtures/attack_delivery_cases.jsonl`，人工复核在 `fixtures/attack_delivery_review.jsonl`。题目与旧20题无重叠，覆盖5次录制、6场战斗；两组轮换先后，每组每题重复2次。每次独立后端实例、SDK重试关闭；输入证据冻结，仍走真实应用检索接口。原始请求及全部回复保存在本机 `tmp/attack-delivery-20261110-api.json`，复核结果不能把返回成功当成正确。
+
+```powershell
+$env:PYTHONPATH='src;tests;.'
+.venv/Scripts/python.exe -m evals.compare_attack_delivery
+# 明确预算并使用新的输出路径才进行付费复测：
+.venv/Scripts/python.exe -m evals.compare_attack_delivery --run --token-budget 200000 --output tmp/attack-delivery-new.json
+```
 
 `fixtures/log_cases.jsonl` 冻结了 2026-11-03 最近一局中的三个真实局面：三能量五费连招、缺少持牌清单的选牌、包含全身撞击和铁斩波的战斗。每行保留来源会话、步骤与事件序号，运行时不读取会变化的轨迹数据库。
 

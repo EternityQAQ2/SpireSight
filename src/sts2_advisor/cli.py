@@ -100,6 +100,32 @@ def environment_flag(name: str, default: bool) -> bool:
     raise ValueError(f"{name} 必须为 true 或 false")
 
 
+def create_remote_backend(
+    *, max_tokens: int | None = None, timeout: float = 60.0,
+    precompute_attacks: bool | None = None,
+) -> OpenAIAdvisor:
+    """Compose production and replay backends from the same loaded environment."""
+    base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
+    thinking = os.environ.get("OPENAI_THINKING", "").strip().lower() or None
+    if thinking is None and base_url and "deepseek.com" in base_url.lower():
+        thinking = "disabled"
+    if thinking not in {None, "enabled", "disabled"}:
+        raise ValueError("OPENAI_THINKING 必须为 enabled 或 disabled")
+    return OpenAIAdvisor(
+        os.environ.get("OPENAI_MODEL", "").strip(),
+        api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
+        base_url=base_url, timeout=timeout,
+        max_tokens=max_tokens if max_tokens is not None else int(os.environ.get("OPENAI_MAX_TOKENS", "1024")),
+        json_mode=environment_flag("OPENAI_JSON_MODE", True),
+        thinking=thinking,
+        reasoning_effort=os.environ.get("OPENAI_REASONING_EFFORT", "").strip().lower() or None,
+        adaptive_thinking=environment_flag("OPENAI_ADAPTIVE_THINKING", False),
+        function_calling=environment_flag("OPENAI_FUNCTION_CALLING", True),
+        precompute_attacks=(environment_flag("OPENAI_PRECOMPUTE_ATTACKS", False)
+                            if precompute_attacks is None else precompute_attacks),
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -155,35 +181,14 @@ def main(argv: list[str] | None = None) -> int:
     elif args.backend == "openai":
         load_environment(PROJECT_ROOT / ".env")
         try:
-            remote_model = os.environ.get("OPENAI_MODEL", "").strip()
-            remote_max_tokens = args.remote_max_tokens or int(
-                os.environ.get("OPENAI_MAX_TOKENS", "1024")
-            )
-            base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
-            thinking = os.environ.get("OPENAI_THINKING", "").strip().lower() or None
-            if thinking is None and base_url and "deepseek.com" in base_url.lower():
-                thinking = "disabled"
-            if thinking not in {None, "enabled", "disabled"}:
-                raise ValueError("OPENAI_THINKING 必须为 enabled 或 disabled")
-            backend = OpenAIAdvisor(
-                remote_model,
-                api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
-                base_url=base_url,
-                timeout=args.remote_timeout,
-                max_tokens=remote_max_tokens,
-                json_mode=environment_flag("OPENAI_JSON_MODE", True),
-                thinking=thinking,
-                reasoning_effort=os.environ.get('OPENAI_REASONING_EFFORT', '').strip().lower() or None,
-                adaptive_thinking=environment_flag('OPENAI_ADAPTIVE_THINKING', False),
-                function_calling=environment_flag("OPENAI_FUNCTION_CALLING", True),
-            )
+            backend = create_remote_backend(max_tokens=args.remote_max_tokens, timeout=args.remote_timeout)
         except Exception as exc:
             print(f"远程模型配置失败：{exc}", file=sys.stderr)
             return 1
         fallback = RuleAdvisor()
         print(
-            f"远程模型：{remote_model}（最大输出 {remote_max_tokens} tokens，"
-            f"思考模式 {'按战斗局面自动切换（困难战斗至少16384输出）' if backend.adaptive_thinking else thinking or '服务默认'}）"
+            f"远程模型：{backend.model_name}（最大输出 {backend.max_tokens} tokens，"
+            f"思考模式 {'按战斗局面自动切换（困难战斗至少16384输出）' if backend.adaptive_thinking else backend.thinking or '服务默认'}）"
         )
     else:
         backend = RuleAdvisor()

@@ -29,6 +29,7 @@ class OpenAIAdvisor:
         adaptive_thinking: bool = False,
         reasoning_effort: str | None = None,
         function_calling: bool = True,
+        precompute_attacks: bool = False,
     ) -> None:
         if not api_key:
             raise ValueError("缺少 OPENAI_API_KEY，请在项目根目录 .env 中配置。")
@@ -51,6 +52,7 @@ class OpenAIAdvisor:
         if self.reasoning_effort not in {None, 'low', 'high', 'max'}:
             raise ValueError('reasoning_effort 必须为 low、high 或 max')
         self.function_calling = function_calling
+        self.precompute_attacks = precompute_attacks
 
     def advise_with_feedback(self, context: DecisionContext, evidence: list[Evidence], feedback: str) -> Advice:
         return self.advise(context, evidence, feedback=feedback)
@@ -62,14 +64,16 @@ class OpenAIAdvisor:
                       sum(1 for enemy in enemies if (enemy.get('hp') or 0) > 0) > 1))
         thinking = ('enabled' if difficult else 'disabled') if self.adaptive_thinking else self.thinking
         max_tokens = max(self.max_tokens, 16384) if thinking == 'enabled' else self.max_tokens
-        prompt = build_prompt(context, evidence, codex_cache=self.codex_cache)
+        inline = self.precompute_attacks and context.decision_type == 'combat_next_action'
+        prompt_options = {'precompute_attacks': True} if inline else {}
+        prompt = build_prompt(context, evidence, codex_cache=self.codex_cache, **prompt_options)
         if feedback:
             prompt += '\n上次计划无法执行：' + feedback + '。请重新选择合法计划。'
         messages = [
-            {"role": "system", "content": build_system_prompt()},
+            {"role": "system", "content": build_system_prompt(**prompt_options)},
             {"role": "user", "content": prompt},
         ]
-        tools_enabled = self.function_calling and context.decision_type == "combat_next_action"
+        tools_enabled = self.function_calling and context.decision_type == "combat_next_action" and not inline
         if tools_enabled:
             messages[0]["content"] += (
                 "\n可调用 calculate_attack 计算单张攻击牌，只指定局面和候选动作；数值和目标修正由工具读取。"

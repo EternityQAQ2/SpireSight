@@ -25,20 +25,25 @@ stable.deck 是卡牌图鉴，不是本局持牌清单，也不是动态数值�
 confidence 范围 0 至 1；无值的数组用 []。"""
 
 
-def build_system_prompt() -> str:
+def build_system_prompt(*, precompute_attacks: bool = False) -> str:
     """Load the versioned project skill; installed Codex copies are independent."""
     packaged = Path(__file__).parent / 'skills/sts2-decider/SKILL.md'
     source = Path(__file__).resolve().parents[3] / 'skills/sts2-decider/SKILL.md'
     text = (packaged if packaged.is_file() else source).read_text(encoding='utf-8')
     if text.startswith('---\n'):
         text = text.split('---\n', 2)[2]
+    tools_note = ('候选的 attack_result 已由只读计算器提前提供，本次没有可调用工具。'
+                  if precompute_attacks else '请使用已提供的 function tools；')
     return (SYSTEM_PROMPT + '\n加载的决策 skill（sts2-decider）：\n' + text.strip()
-            + '\n当前通过 API 决策，请使用已提供的 function tools；无 shell 或脚本执行能力。'
+            + '\n当前通过 API 决策，' + tools_note + '无 shell 或脚本执行能力。'
               '按上面的建议 JSON 格式返回，不执行游戏动作。')
 
 
-def build_prompt(context: DecisionContext, evidence: list[Evidence], *, codex_cache: CodexCache | None = None) -> str:
-    payload = model_context_payload(context, codex_cache=codex_cache)
+def build_prompt(
+    context: DecisionContext, evidence: list[Evidence], *, codex_cache: CodexCache | None = None,
+    precompute_attacks: bool = False,
+) -> str:
+    payload = model_context_payload(context, codex_cache=codex_cache, precompute_attacks=precompute_attacks)
     payload["evidence"] = [
         {"id": item.evidence_id, "title": item.source_title, "text": item.text}
         for item in evidence

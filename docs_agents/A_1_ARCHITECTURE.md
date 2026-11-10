@@ -6,12 +6,12 @@
 
 | 范围 | 主要文件与职责 |
 |---|---|
-| 启动组装 | cli.py：参数、环境配置、具体实现组装；contracts.py：跨模块数据和协议 |
+| 启动组装 | cli.py：参数、环境配置、具体实现组装；create_remote_backend供线上/回放共用；contracts.py：跨模块数据和协议 |
 | 应用编排 | application/advisor.py：观察、去重、唯一候选、检索、模型、校验、短计划、执行 |
 | 游戏状态 | game/state.py、deck.py、candidates.py：规范化、持牌观测、合法候选 |
 | 单张算术 | game/combat/calculator.py：指定攻击直接伤害，纯函数，无数据库/模型/游戏I/O |
 | 已支持回合效果 | game/combat/effects.py、simulation.py、search.py：有限效果与搜索，不能当通用模拟器 |
-| 决策输入 | decision/context.py、metrics.py、prompts.py：图鉴缓存、当前数值、提示词和skill加载 |
+| 决策输入 | decision/context.py、metrics.py、prompts.py：图鉴缓存、当前数值、提示词和skill加载；可选首轮攻击结果复用原calculator，不实现第二套算术 |
 | 决策输出 | decision/parsing.py、validation.py、plan_check.py、plans.py：解析、校验、资源/目标与复用 |
 | 工具协议 | decision/tools.py：schema和局面绑定分派，不实现第二套伤害规则 |
 | 游戏接入 | integrations/sts2/client.py、actions.py：REST、动作预检和去重 |
@@ -38,6 +38,8 @@
 5. 默认只读，只有auto-act执行。动作前重新读取；watch的失败状态暂停避免重复付费。
 
 policy.py/survival.py等旧方法的存在不意味着在线使用，检查advisor.py实际导入与调用。不要通过改测试恢复已取消的战术接管。
+
+首轮攻击结果模式通过OPENAI_PRECOMPUTE_ATTACKS控制，默认false（实测降本但质量门槛失败）。开启只影响战斗输入/工具注册，不改变应用战术责任。`evals.compare_attack_delivery`注入录制观察、冻结证据及无执行器，调用真实AdvisorService.run_once；复用配置工厂，避免复制另一套在线准备流程。
 
 ## 重要事实来源
 
