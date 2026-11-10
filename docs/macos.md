@@ -70,7 +70,7 @@ MPS 不可用、内存不足或模型算子不兼容时，可尝试：
   --model "/path/to/local model" --device cpu --max-new-tokens 128
 ```
 
-模型加载失败会退出；生成失败或输出非法动作时，现有流程降级到规则建议。CPU 可能更慢且需要更多内存。Intel Mac 可使用无模型依赖的规则后端；本次没有验证 Intel Mac 的 PyTorch 安装和模型推理。
+模型加载失败会退出。战斗生成或解析失败会停止该决策，监听模式会暂停相同失败局面；计划校验失败最多交回模型重决策一次，不自动改选规则战术。非战斗可在已配置的情况下规则回退。CPU 可能更慢且需要更多内存；Intel Mac 的 PyTorch 安装和模型推理仍需在对应设备验证。
 
 设备处理参考 [PyTorch MPS 文档](https://docs.pytorch.org/docs/stable/notes/mps.html)，离线加载及缓存参数参考 [Transformers 模型文档](https://huggingface.co/docs/transformers/main_classes/model)。
 

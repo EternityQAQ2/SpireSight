@@ -44,7 +44,7 @@ SQLite 数据使用 JSON 文本保存原有字段和值；同一事件中的数�
 | `decision.input` | 完整 `raw_state`、规范化 `context`、所有候选动作及参数 |
 | `retrieval.request` | 使用的检索器、上下文、`top_k` |
 | `retrieval.query` | JSONL 词项、Chroma 查询文本，或 SQLite 实体 ID/名称等实际查询条件 |
-| `retrieval.ranked` | JSONL 返回的证据快照及原生词项匹配分数 |
+| `retrieval.ranked` | JSONL 证据与词项匹配分数；SQLite 事实的优先级与相关性理由 |
 | `retrieval.raw_result` | Chroma 返回结果，包含其实际返回的距离等字段 |
 | `retrieval.rows` | SQLite 命中的原始事实/交互记录 |
 | `retrieval.result` | 最终合并后交给后端的证据快照，保留文本、顺序、来源和 metadata |
@@ -54,7 +54,7 @@ SQLite 数据使用 JSON 文本保存原有字段和值；同一事件中的数�
 | `model.parsed` | 本地模型输出解析后的 JSON |
 | `model.error` | 单次调用异常及耗时 |
 | `decision.proposal` | 主后端给出的结构化建议，保存于校验之前 |
-| `decision.validation_error` / `decision.fallback` | 解析、生成或校验错误，以及使用规则回退的原因 |
+| `decision.validation_error` / `decision.fallback` | 解析、生成或校验错误，以及允许的非战斗规则回退原因；战斗失败不自动换战术 |
 | `decision.output` | 最终建议、实际后端来源和控制台呈现文本 |
 | `plan.created` / `plan.reused` / `plan.invalidated` | 短计划内容、来源步骤、复用后的建议与证据、失效事件 |
 | `action.precheck` | 执行动作前重新读取的完整原始状态 |

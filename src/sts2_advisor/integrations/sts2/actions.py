@@ -1,4 +1,4 @@
-"""游戏动作的发送与推荐执行，协议参照 docs/api.md。
+"""游戏动作的发送与推荐执行，协议参照 docs/SLS2MCP_api.md。
 
 直接调用：action("play_card", card_index=0, target="NIBBIT_0")。
 自动执行：main.py --watch --auto-act --backend transformers。

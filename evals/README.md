@@ -1,14 +1,15 @@
 # 固定局面回归
 
-2026-11-10 新增20个日志快照及三路知识来源审计，用于对比当前提示词与精简提示词。入口为 `python -m evals.compare_prompts`；默认仅离线检查，`--run` 才调用现有 DeepSeek 配置，最多32请求、160000 token。默认选择8题，开发题与留出题各4个。实验版seed位于 `fixtures/seed_examples.jsonl`，不会覆盖生产seed。
+20个日志快照及来源审计在 `fixtures/prompt_cases.jsonl` 等文件中。多轮复用后，原heldout标签不再代表独立未见测试。实验结论和证据索引集中在 [维护笔记](../docs_agents/EXPERIMENTS.md)，当前配置与后续方案见 [当前状态](../docs_agents/PROJECT_STATE.md)。
 
-结果、限制和已修复的SQLite名称误匹配详见 [实验报告](../docs/prompt-evaluation-20261110.md)。这组实验没有证明精简提示词提高决策质量，因此未切换线上默认。更新基准请将 `--prepare --fixtures` 指向新文件，保留旧输入便于比较。
+| 入口（python -m） | 用途 | 默认行为 / 付费预算 |
+|---|---|---|
+| evals.compare_prompts | 当前提示与精简提示对照 | 离线；--run才付费，32请求/16万token |
+| evals.compare_retrieval | Git基线与当前真实检索对照 | 本地SQLite/Chroma/seed，不调用决策API |
+| evals.replay_retrieval_decisions | 相同提示、不同冻结证据的8组重放 | 离线；--run才付费，32请求/16万token |
+| evals.compare_decision_options | 工具、摘要与Pro四组对照 | 离线；--run才付费，64请求/36万token |
 
-检索本身的前后对照使用 `python -m evals.compare_retrieval --baseline 932eb58 --output tmp/retrieval-new.json`。它只查询本地SQLite、Chroma和seed，不调用决策API；默认20局面、每版本重复3次，保留逐题证据及耗时。已应用的事实排序和场景查询见 [检索改进报告](../docs/retrieval-relevance-20261110.md)。
-
-模型侧复测使用 `python -m evals.replay_retrieval_decisions`：默认只列输入，加 `--run --output 新路径` 才调用API。保持当前提示词不变，以冻结的前后检索证据做8组成对比较，共享32请求、160000 token预算。首轮结果未观察到稳定决策提升，详见 [模型复测报告](../docs/retrieval-decision-eval-20261110.md)。
-
-计算器/模型四组实验使用 `python -m evals.compare_decision_options`，加 `--run --output 新路径` 才请求API。对比旧工具Flash、新工具Flash、两方案摘要Flash和新工具Pro，均关闭思考，最多64请求/360000 token。已采用计算器修复，其余实验配置未上线；[四组结果报告](../docs/calculator-model-eval-20261110.md)记录token、错误、成功率和时延。
+付费脚本必须用新输出路径，不覆盖原始结果。历史实验使用1600输出上限和top_k=6；线上战斗目前最多4条证据，本机输出配置1024，不要当成完全相同的线上回放。新轮实验先对齐准备路径与参数。实验seed不会覆盖生产seed。
 
 `fixtures/log_cases.jsonl` 冻结了 2026-11-03 最近一局中的三个真实局面：三能量五费连招、缺少持牌清单的选牌、包含全身撞击和铁斩波的战斗。每行保留来源会话、步骤与事件序号，运行时不读取会变化的轨迹数据库。
 
