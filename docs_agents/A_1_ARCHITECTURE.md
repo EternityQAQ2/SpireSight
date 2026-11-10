@@ -10,6 +10,7 @@
 | 应用编排 | application/advisor.py：观察、去重、唯一候选、检索、模型、校验、短计划、执行 |
 | 游戏状态 | game/state.py、deck.py、candidates.py：规范化、持牌观测、合法候选 |
 | 单张算术 | game/combat/calculator.py：指定攻击直接伤害，纯函数，无数据库/模型/游戏I/O |
+| 观测数值 | game/combat/facts.py：敌人ID与威胁、立即生命成本、格挡前荆棘、当前费用有效期；未知不伪造0，不据此选择战术 |
 | 已支持回合效果 | game/combat/effects.py、simulation.py、search.py：有限效果与搜索，不能当通用模拟器 |
 | 决策输入 | decision/context.py、metrics.py、prompts.py：图鉴缓存、当前数值、提示词和skill加载；可选首轮攻击结果复用原calculator，不实现第二套算术 |
 | 决策输出 | decision/parsing.py、validation.py、plan_check.py、plans.py：解析、校验、资源/目标与复用 |
@@ -40,6 +41,8 @@
 policy.py/survival.py等旧方法的存在不意味着在线使用，检查advisor.py实际导入与调用。不要通过改测试恢复已取消的战术接管。
 
 首轮攻击结果模式通过OPENAI_PRECOMPUTE_ATTACKS控制，默认false（实测降本但质量门槛失败）。开启只影响战斗输入/工具注册，不改变应用战术责任。`evals.compare_attack_delivery`注入录制观察、冻结证据及无执行器，调用真实AdvisorService.run_once；复用配置工厂，避免复制另一套在线准备流程。
+
+`evals.compare_decision_quality`复用上述回放与RequestBudget，旧输入按Git版本加载；共用CLI的model_name可选覆盖，不修改.env。模型输入用hp_loss/retaliation_damage取代含混的self_damage，后者仍留给旧policy的兼容调用。评测人工复核分别保存交付动作、未执行后缀、理由错误；预算取消与模型空回复单列。
 
 ## 重要事实来源
 

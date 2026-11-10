@@ -9,10 +9,13 @@
 | evals.replay_retrieval_decisions | 相同提示、不同冻结证据的8组重放 | 离线；--run才付费，32请求/16万token |
 | evals.compare_decision_options | 工具、摘要与Pro四组对照 | 离线；--run才付费，64请求/36万token |
 | evals.compare_attack_delivery | 真实应用流程，工具往返 vs 首轮攻击结果 | 离线；--prepare冻结本地检索，--run为6题×2配置×2次，最多48请求/20万token |
+| evals.compare_decision_quality | 旧输入Flash / 修正输入Flash / 修正输入Pro | 离线；--run为8题×3配置×2次，最多96请求/50万token；预算不足则在网络前取消 |
 
 付费脚本必须用新输出路径，不覆盖原始结果。历史实验使用1600输出上限和top_k=6；线上战斗目前top_k最多4，另加不占名额的固定seed，本机输出配置1024。`compare_attack_delivery`复用CLI配置工厂和AdvisorService的检索、校验、一次重决策与只读交付，保留原始提案及校验后前缀；恢复已录制的观测上下文，不重新猜测历史牌组。这是隔离局面的回放，不检验连续计划复用或平均楼层。其他旧实验不等于完整线上回放。
 
 新6题固定在 `fixtures/attack_delivery_cases.jsonl`，人工复核在 `fixtures/attack_delivery_review.jsonl`。题目与旧20题无重叠，覆盖5次录制、6场战斗；两组轮换先后，每组每题重复2次。每次独立后端实例、SDK重试关闭；输入证据冻结，仍走真实应用检索接口。原始请求及全部回复保存在本机 `tmp/attack-delivery-20261110-api.json`，复核结果不能把返回成功当成正确。
+
+质量对照另用 `fixtures/decision_quality_cases.jsonl`（6个回归、2个新增录制局面，非独立留出集），复核 `decision_quality_review.jsonl`。`compare_decision_quality`从Git c1dd6b6加载4个旧输入模块，不能用历史坏答案充当现测基线。默认普通模式、1024输出、真实应用top_k；评分分别保留动作合理/明确差解/待判断、理由错误、原计划错误、空回复与未发送。全部API尝试共用预算，最后剩余预算不足保守预留时也不得强行发送。2026-11-10实际47次付费决策、80请求、485999 token；第48项未发，比较使用三组共同15对。
 
 ```powershell
 $env:PYTHONPATH='src;tests;.'

@@ -124,8 +124,8 @@ def prepare(path: Path):
     path.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), encoding='utf-8')
 
 
-def model_trial(row: dict, inline: bool, budget: RequestBudget) -> dict:
-    backend = create_remote_backend(precompute_attacks=inline)
+def model_trial(row: dict, inline: bool, budget: RequestBudget, *, model_name: str | None = None) -> dict:
+    backend = create_remote_backend(precompute_attacks=inline, model_name=model_name)
     backend.client.max_retries = 0
     if backend.thinking != 'disabled' or backend.adaptive_thinking:
         backend.client.close()

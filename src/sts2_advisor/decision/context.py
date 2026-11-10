@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from sts2_advisor.contracts import DecisionContext
 from sts2_advisor.game.deck import inventory
-from sts2_advisor.game.combat.facts import combat_summary
+from sts2_advisor.game.combat.facts import combat_summary, attack_cost_scope
 from sts2_advisor.game.combat.search import rank_turns
 from sts2_advisor.game.combat.calculator import calculate
 from sts2_advisor.decision.metrics import dynamic_card_metrics
@@ -74,7 +74,21 @@ def model_context_payload(
                 card = cards.get(item.params.get("card_index"))
                 if card is not None and item.action_type == "play_card":
                     entry.update(dynamic_card_metrics(item, card, enemies, int(player.get("energy") or 0)))
-        payload["turn_search"] = rank_turns(context)
+                target = item.params.get("target")
+                if target:
+                    entry["target_id"] = target
+                    entry["label"] += f" [{target}]"
+        payload["cost_scope"] = attack_cost_scope(player)
+        payload["card_metrics_scope"] = (
+            "目标按entity_id/target_id对应，不混用同名敌人状态。cost只保证当前状态；"
+            "reobserve_after_attack=true时打出一张攻击就停止计划，重新读取剩余费用。"
+            "hp_loss为牌面立即失去生命，无视格挡；retaliation_damage为已观测荆棘的格挡前伤害，"
+            "假设全部段数命中，提前击杀可能减少；两者不能混为实际掉血。null未知。"
+        )
+        payload["turn_search"] = (
+            {"available": False, "reason": "目标荆棘数值未知，不能精确试算本回合"}
+            if summary and any(e["thorns"] is None for e in summary["enemies"]) else rank_turns(context)
+        )
         if precompute_attacks:
             cards = {card.get("index"): card for card in player.get("hand", [])}
             for item, entry in zip(context.candidates, candidates):

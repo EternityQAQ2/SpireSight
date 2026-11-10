@@ -5,6 +5,7 @@ from sts2_advisor.contracts import Candidate
 from sts2_advisor.game.combat.facts import (
     ATTACK_DAMAGE_RE, BLOCK_RE, ALL_ENEMIES_MARK, card_block, card_hits,
     card_damage_per_hit, target_thorns, enemy_thorns,
+    card_hp_loss, attack_retaliation,
 )
 from sts2_advisor.game.combat.effects import energy_cost, known_effect
 
@@ -50,6 +51,8 @@ def dynamic_card_metrics(candidate: Candidate, card: dict, enemies: list[dict], 
     """
 
     metrics = candidate_metrics(candidate, card, enemies)
+    # Legacy policy metrics keep self_damage; model input uses explicit kinds.
+    metrics.pop("self_damage", None)
     attack = card.get("type") == "Attack"
     metrics["cost"] = energy_cost(card, energy)
     metrics["star_cost"] = card.get("star_cost")
@@ -59,5 +62,7 @@ def dynamic_card_metrics(candidate: Candidate, card: dict, enemies: list[dict], 
     if attack and match and metrics["dmg"] is None:
         metrics["dmg"] = int(match[1]) * int(match[2] or 1)
     metrics["effect_supported"] = known_effect(card) is not None
+    metrics["hp_loss"] = card_hp_loss(card)
+    metrics["retaliation_damage"] = attack_retaliation(candidate, card, enemies)
     metrics["damage_basis"] = "当前牌面；目标易伤等加成由逐步试算处理"
     return metrics

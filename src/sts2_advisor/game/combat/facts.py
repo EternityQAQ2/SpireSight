@@ -59,6 +59,24 @@ def enemy_thorns(enemy: dict) -> int:
     return 0
 
 
+def observed_thorns(enemy: dict) -> int | None:
+    """Prompt facts retain unknown amounts; legacy simulation stays unchanged."""
+    statuses = enemy.get("status")
+    if not isinstance(statuses, list):
+        return None
+    total = 0
+    for status in statuses:
+        if not isinstance(status, dict):
+            return None
+        if (str(status.get("id") or "").upper().startswith("THORNS") or
+                "荆棘" in str(status.get("name") or "")):
+            amount = status.get("amount")
+            if type(amount) is not int or amount < 0:
+                return None
+            total += amount
+    return total
+
+
 def card_block(card: dict) -> int:
     match = BLOCK_RE.search(str(card.get("description") or ""))
     return int(match.group(1)) if match else 0
@@ -94,6 +112,55 @@ def target_thorns(candidate: Candidate, enemies: list[dict]) -> int:
     return max((enemy_thorns(enemy) for enemy in enemies), default=0)
 
 
+def card_hp_loss(card: dict) -> int | None:
+    """Only an immediate, numeric life payment is known; never guess a trigger."""
+    text = re.sub(r"\s+", "", str(card.get("description") or ""))
+    match = re.match(r"失去(\d+)点生命[。.]", text)
+    if match:
+        return int(match.group(1))
+    return None if not text or re.search(r"失去[^。]*生命", text) else 0
+
+
+def attack_retaliation(candidate: Candidate, card: dict, enemies: list[dict]) -> int | None:
+    """Observed thorns before block, assuming all described hits land.
+
+    Random targets, missing hit counts or unknown thorns remain unknown. This
+    is not net life loss and does not simulate early target death or other powers.
+    """
+    if card.get("type") != "Attack":
+        return 0
+    text = str(card.get("description") or "").replace("两次", "2次")
+    match = ATTACK_DAMAGE_RE.search(text)
+    target = candidate.params.get("target")
+    random_target = "随机" in text
+    if not match or re.search(r"[Xx]\s*次", text) or random_target and len(enemies) != 1:
+        return None
+    targets = ([e for e in enemies if e.get("entity_id") == target] if target else
+               enemies if "所有敌人" in text or random_target else [])
+    if not targets:
+        return None
+    total = 0
+    for enemy in targets:
+        amount = observed_thorns(enemy)
+        if amount is None:
+            return None
+        total += amount
+    return total * int(match.group(2) or 1)
+
+
+def attack_cost_scope(player: dict) -> dict:
+    """Current displayed costs cannot certify costs after a temporary discount."""
+    result = {"basis": "current_state"}
+    for status in player.get("status") or []:
+        if str(status.get("id") or "").upper().removesuffix("_POWER") == "FREE_ATTACK":
+            amount = status.get("amount")
+            if type(amount) is int and amount == 0:
+                continue
+            result.update(free_attacks_remaining=amount if type(amount) is int and amount > 0 else None,
+                          later_attack_costs=None, reobserve_after_attack=True)
+    return result
+
+
 def combat_summary(context: DecisionContext) -> dict[str, Any] | None:
     """给提示词用的本回合威胁摘要；非战斗局面返回 None。"""
     battle = context.situation.get("battle")
@@ -121,13 +188,14 @@ def combat_summary(context: DecisionContext) -> dict[str, Any] | None:
         block = int(enemy.get("block") or 0)
         rows.append(
             {
+                "entity_id": enemy.get("entity_id"),
                 "name": name,
                 "hp": hp,
                 "block": block,
                 "effective_hp": hp + block,
                 "incoming": damage,
                 "hits": hits,
-                "thorns": enemy_thorns(enemy),
+                "thorns": observed_thorns(enemy),
             }
         )
     player_block = int(context.player.get("block") or 0)

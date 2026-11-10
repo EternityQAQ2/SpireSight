@@ -208,7 +208,8 @@ class PromptPayloadTest(unittest.TestCase):
         self.assertEqual(payload["combat"]["incoming_damage"], 23)
         self.assertTrue(payload["combat"]["lethal_if_unblocked"])
         card = next(item for item in payload["candidates"] if item["id"] == "card:0")
-        self.assertEqual(card["self_damage"], 20)
+        self.assertEqual(card["retaliation_damage"], 20)
+        self.assertNotIn("self_damage", card)
 
     def test_non_combat_payload_is_unchanged(self) -> None:
         context = make_context(decision_type="event")

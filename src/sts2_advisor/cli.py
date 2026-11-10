@@ -102,7 +102,7 @@ def environment_flag(name: str, default: bool) -> bool:
 
 def create_remote_backend(
     *, max_tokens: int | None = None, timeout: float = 60.0,
-    precompute_attacks: bool | None = None,
+    precompute_attacks: bool | None = None, model_name: str | None = None,
 ) -> OpenAIAdvisor:
     """Compose production and replay backends from the same loaded environment."""
     base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
@@ -112,7 +112,7 @@ def create_remote_backend(
     if thinking not in {None, "enabled", "disabled"}:
         raise ValueError("OPENAI_THINKING 必须为 enabled 或 disabled")
     return OpenAIAdvisor(
-        os.environ.get("OPENAI_MODEL", "").strip(),
+        model_name if model_name is not None else os.environ.get("OPENAI_MODEL", "").strip(),
         api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
         base_url=base_url, timeout=timeout,
         max_tokens=max_tokens if max_tokens is not None else int(os.environ.get("OPENAI_MAX_TOKENS", "1024")),
