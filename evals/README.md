@@ -10,6 +10,9 @@
 | evals.compare_decision_options | 工具、摘要与Pro四组对照 | 离线；--run才付费，64请求/36万token |
 | evals.compare_attack_delivery | 真实应用流程，工具往返 vs 首轮攻击结果 | 离线；--prepare冻结本地检索，--run为6题×2配置×2次，最多48请求/20万token |
 | evals.compare_decision_quality | 旧输入Flash / 修正输入Flash / 修正输入Pro | 离线；--run为8题×3配置×2次，最多96请求/50万token；预算不足则在网络前取消 |
+| evals.replay_end_turn | 扫描本地录制的结束回合计划，区分未知、致死投影、实际是否触发重决策 | 始终离线，不导入模型/游戏客户端，不花token；--output须新路径 |
+
+用户于2026-11-16要求以后不再测试Pro。含Pro的旧入口仅保留复现资料，后续不得沿用其默认组合发起Pro付费测试。
 
 付费脚本必须用新输出路径，不覆盖原始结果。历史实验使用1600输出上限和top_k=6；线上战斗目前top_k最多4，另加不占名额的固定seed，本机输出配置1024。`compare_attack_delivery`复用CLI配置工厂和AdvisorService的检索、校验、一次重决策与只读交付，保留原始提案及校验后前缀；恢复已录制的观测上下文，不重新猜测历史牌组。这是隔离局面的回放，不检验连续计划复用或平均楼层。其他旧实验不等于完整线上回放。
 

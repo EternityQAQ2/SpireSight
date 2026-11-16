@@ -5,6 +5,7 @@ from sts2_advisor.contracts import DecisionContext
 from sts2_advisor.contracts import PlanCheck
 from sts2_advisor.game.combat.effects import energy_cost, energy_gain, known_effect
 from sts2_advisor.game.combat.simulation import initial_state, play
+from sts2_advisor.game.combat.forecast import check_end_turn
 
 
 def check_plan(context: DecisionContext, ids: list[str]) -> PlanCheck:
@@ -30,6 +31,9 @@ def check_plan(context: DecisionContext, ids: list[str]) -> PlanCheck:
             if pos != len(ids) - 1:
                 return PlanCheck(prefix, "结束回合后仍有计划动作")
             prefix.append(ident)
+            safety = check_end_turn(context, prefix)
+            if safety.get('status') == 'retry':
+                return PlanCheck(prefix[:-1], safety['feedback'])
             break
         if candidate.action_type != "play_card":
             return PlanCheck(prefix + [ident], boundary="非出牌效果需要重新观测")
