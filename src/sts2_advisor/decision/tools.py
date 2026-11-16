@@ -12,7 +12,7 @@ from sts2_advisor.game.combat.calculator import calculate
 
 TOOL_SCHEMAS = [{"type": "function", "function": {
     "name": "calculate_attack",
-    "description": "核对当前一张攻击牌对指定目标的直接伤害；不执行动作，不预测其他效果。手牌伤害已包含玩家力量等修正。",
+    "description": "核对当前一张攻击牌对指定目标的直接伤害，同时返回已验证的玩家即时生命与格挡；未知保持unknown。不执行动作，不预测敌人回合或回合末。手牌伤害已包含玩家力量等修正。",
     "parameters": {"type": "object", "properties": {
         "decision_id": {"type": "string", "description": "当前输入的 decision_id"},
         "candidate_id": {"type": "string", "description": "当前攻击候选 ID"},

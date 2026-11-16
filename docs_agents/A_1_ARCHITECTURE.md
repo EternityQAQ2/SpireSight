@@ -9,7 +9,7 @@
 | 启动组装 | cli.py：参数、环境配置、具体实现组装；create_remote_backend供线上/回放共用；contracts.py：跨模块数据和协议 |
 | 应用编排 | application/advisor.py：观察、去重、唯一候选、检索、模型、校验、短计划、执行 |
 | 游戏状态 | game/state.py、deck.py、candidates.py：规范化、持牌观测、合法候选 |
-| 单张算术 | game/combat/calculator.py：指定攻击直接伤害，纯函数，无数据库/模型/游戏I/O |
+| 单张算术 | game/combat/calculator.py：指定攻击直接伤害及有限的玩家即时生命/格挡；额外结算未知时单独标记。纯函数，无数据库/模型/游戏I/O |
 | 回合末验证 | game/combat/forecast.py：复用现有模拟器投影完整确定计划，保守验证致死及一条存活见证；由check_plan转成错误反馈，不返回替代动作 |
 | 观测数值 | game/combat/facts.py：敌人ID与威胁、立即生命成本、格挡前荆棘、当前费用有效期；未知不伪造0，不据此选择战术 |
 | 已支持回合效果 | game/combat/effects.py、simulation.py、search.py：有限效果与搜索，不能当通用模拟器 |
