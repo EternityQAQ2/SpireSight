@@ -13,6 +13,7 @@
 | evals.replay_end_turn | 扫描本地录制的结束回合计划，区分未知、致死投影、实际是否触发重决策 | 始终离线，不导入模型/游戏客户端，不花token；--output须新路径 |
 | evals.oracle_diagnostic | Flash自由规划 / 两计划 / 两计划＋核实后果 | 默认离线；--run为3题×3组×2次，最多18单请求/15万token，不挂工具或校验重试 |
 | evals.compare_player_outcome | 只比较工具回包新增玩家即时HP/格挡，Git b827915为旧基线 | 默认离线；--prepare冻结三路证据；--run为3快照×2组×2次，最多48请求/20万token；普通Flash、原function calling |
+| evals.medium_player_outcome | 旧计算器+旧描述 vs 新计算器+新描述，中规模只读回放 | 默认离线；32快照×2组×2次=128决策；--run才付费，硬上限512请求/200万token；不因错误补跑 |
 
 用户于2026-11-16要求以后不再测试Pro。含Pro的旧入口仅保留复现资料，后续不得沿用其默认组合发起Pro付费测试。
 

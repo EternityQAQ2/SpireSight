@@ -1,0 +1,336 @@
+{
+  "selection": "medium-20261116-v1; SHA256-ordered stratified pool; one per recording+floor, at most4 per recording; all previous fixture IDs and encounters excluded",
+  "quotas": {
+    "self_loss": 4,
+    "common_known": 12,
+    "complex_boundary": 8,
+    "unknown_single": 8
+  },
+  "repetitions": 2,
+  "planned_decisions": 128,
+  "token_limit": 2000000,
+  "request_limit": 512,
+  "review": "Separate first action, original suffix, arithmetic claims, unknown handling; no forced single gold action; rubric withheld from model; assistant review not independent gold",
+  "cases": [
+    {
+      "case_id": "m01",
+      "source": "recordings\\session-20261109-214328-690834.jsonl",
+      "source_index": 51,
+      "group": "self_loss",
+      "decision_id": "sha256:ec0db509a94ff9df4f0ffbbc574d9a5a9b4a353bc79c82e0cdba76332859ac02",
+      "floor": 11,
+      "known_candidates": 4,
+      "rubric": "滑溜目标15血1层与13血10攻目标：御血术17可杀后者自损2，不能把前者按17直接杀；比较先杀攻击者、燃烧升级输出。消耗抽牌后停。"
+    },
+    {
+      "case_id": "m02",
+      "source": "recordings\\session-20261109-214328-690834.jsonl",
+      "source_index": 19,
+      "group": "self_loss",
+      "decision_id": "sha256:1bd42126439b12feb0ed98f088a2693d435581372db21d9e489ce301d18c32ab",
+      "floor": 8,
+      "known_candidates": 4,
+      "rubric": "2费，两个敌人各8攻；御血术对易伤37血目标25伤不能杀。防御可减5，燃烧有未来收益但需明确换血；非击杀攻击不减少当前攻击。"
+    },
+    {
+      "case_id": "m03",
+      "source": "recordings\\session-20261109-224353-402561.jsonl",
+      "source_index": 6,
+      "group": "self_loss",
+      "decision_id": "sha256:dabf02fd4c3200f2b3a566e5a3a9a110cadb437d5c2b42d61af1f4b7e56034d3",
+      "floor": 17,
+      "known_candidates": 9,
+      "rubric": "18血对9+15攻，无格挡和药水；可用攻击未见确定斩杀路径，不承诺存活。愤怒0费、自损2；历石第7回合末等触发需计入，不能无依据说无解。"
+    },
+    {
+      "case_id": "m04",
+      "source": "recordings\\session-20261109-213340-242747.jsonl",
+      "source_index": 6,
+      "group": "self_loss",
+      "decision_id": "sha256:1a577207ac3c577f9a1448856bda8f3b9f25b284565192783992c7c6ad68dac8",
+      "floor": 6,
+      "known_candidates": 6,
+      "rubric": "3费，可用无情猛攻18→免费御血术19→打击10，集中42血攻击者可杀，自损2；也可比较杀21血目标并防御。减费后重读，不能把所有攻击都免费或继续重复加力量。"
+    },
+    {
+      "case_id": "m05",
+      "source": "recordings\\session-20261104-224452-412875.jsonl",
+      "source_index": 55,
+      "group": "common_known",
+      "decision_id": "sha256:a45a9514644d3bc14024021b1a9e77faaa9f539195751069e42401b3aba73a29",
+      "floor": 6,
+      "known_candidates": 2,
+      "rubric": "1费对15血易伤1强化敌人：铁斩波7、打击9均不能单杀。没有当前攻击，盾无即时收益，允许具体长远理由与药水换取击杀。"
+    },
+    {
+      "case_id": "m06",
+      "source": "recordings\\session-20261104-224452-412875.jsonl",
+      "source_index": 76,
+      "group": "common_known",
+      "decision_id": "sha256:5a3e9655f7103ae3e27e308a05e2ffd7f969dcf78b2c7fb2b1ec8d9d633f2db0",
+      "floor": 7,
+      "known_candidates": 4,
+      "rubric": "3费对31血攻10与16血5盾攻12；铁斩波6不能击杀；痛击9和易伤后的铁斩波可连算但单次工具不得串接。比较5格挡、防御、燃烧未来收益。"
+    },
+    {
+      "case_id": "m07",
+      "source": "recordings\\session-20261023-205154-850740.jsonl",
+      "source_index": 0,
+      "group": "common_known",
+      "decision_id": "sha256:b1f925d5c855fef632e1a4bf01af0af3dd79f24bb077ee84a2129d046a3b348b",
+      "floor": 7,
+      "known_candidates": 4,
+      "rubric": "睡眠精英127血缓慢0；重锤32、双铁斩波等可比较。睡眠会被攻击打断，当前意图不等于攻击后仍不攻；复制下一张与药水动态须观察。"
+    },
+    {
+      "case_id": "m08",
+      "source": "recordings\\session-20261104-224452-412875.jsonl",
+      "source_index": 100,
+      "group": "common_known",
+      "decision_id": "sha256:975f6fd08de241b6d9463c8ee6c5ff624b0ddbc208d57d9a76de7e6e58a5b198",
+      "floor": 8,
+      "known_candidates": 6,
+      "rubric": "15血、三敌：22血塞牌，13血攻3，11血攻4；铁斩波6+完美打击17等可能击杀，重锤35可杀一只但耗3费。抽牌或虚弱后观察，不能把单体虚弱套全体。"
+    },
+    {
+      "case_id": "m09",
+      "source": "recordings\\session-20261025-214357-141746.jsonl",
+      "source_index": 458,
+      "group": "common_known",
+      "decision_id": "sha256:ef5260fb51ade100e477880b80f9c3de2f6f5c4cd6480f38170285fb45325d90",
+      "floor": 6,
+      "known_candidates": 2,
+      "rubric": "3费对40血不攻击敌人；双重5×2和打击6不能击杀。纯盾无即时收益，耸肩有抽牌价值，抽牌后停止。多段次数不得漏。"
+    },
+    {
+      "case_id": "m10",
+      "source": "recordings\\session-20261104-224452-412875.jsonl",
+      "source_index": 122,
+      "group": "common_known",
+      "decision_id": "sha256:f590279fce221f30d796f1dcd70e176c2ef24c6407a0b55c0f246160d1422610",
+      "floor": 9,
+      "known_candidates": 12,
+      "rubric": "9血对10+3+6攻，滑溜各1；优先真实求生比较，迅捷抽牌后停止。双重分别触发滑溜，不能将单段10伤当击杀13血。统御会改变力量后须重读。"
+    },
+    {
+      "case_id": "m11",
+      "source": "recordings\\session-20261109-212300-429763.jsonl",
+      "source_index": 57,
+      "group": "common_known",
+      "decision_id": "sha256:d9b420040ab597a2875907febf8b020efcf665051f9f327bb3f47644cbc671b4",
+      "floor": 6,
+      "known_candidates": 2,
+      "rubric": "1费对6攻攻击者与强化者，打击10不能杀42血。防御可省5，攻击允许有具体长期收益；单体虚弱仅影响指定敌人，勿称非致死攻击阻止6攻。"
+    },
+    {
+      "case_id": "m12",
+      "source": "recordings\\session-20261023-221727-397571.jsonl",
+      "source_index": 30,
+      "group": "common_known",
+      "decision_id": "sha256:33a43079be5e8f5a1680fdc79fbfac7826aeda7d9d90af50d495926a09c2d976",
+      "floor": 4,
+      "known_candidates": 2,
+      "rubric": "1费对21血易伤强化敌人：打击6×1.5=9不能杀；3费全体牌不可打。无攻击时纯防御无即时收益。"
+    },
+    {
+      "case_id": "m13",
+      "source": "recordings\\session-20261026-202702-348990.jsonl",
+      "source_index": 20,
+      "group": "common_known",
+      "decision_id": "sha256:d741a849e4a8796bf8f03f4f2a28d9369b94b71165cc4fafb91cd812af4de478",
+      "floor": 3,
+      "known_candidates": 2,
+      "rubric": "1费对14血强化者、25血攻7；打击8不杀，防御5可省血，敏捷药水改变牌面后重读。允许明确长期换血，不捏造阻止攻击。"
+    },
+    {
+      "case_id": "m14",
+      "source": "recordings\\session-20261016-170937.jsonl",
+      "source_index": 3,
+      "group": "common_known",
+      "decision_id": "sha256:4b1199b4f733645bcb51a1b3bf5bdc3faa14ee58fb92bd06536a44d71a600e03",
+      "floor": 1,
+      "known_candidates": 1,
+      "rubric": "2费对18血攻6：打击6+防御5与双防御各有输出/掉血取舍；不可把两个1费防御当1费或6伤杀18。"
+    },
+    {
+      "case_id": "m15",
+      "source": "recordings\\session-20261105-201253-679615.jsonl",
+      "source_index": 7,
+      "group": "common_known",
+      "decision_id": "sha256:a693d8654b61664765f1fc3cfb548395437241be6c1b5c4d5fbc57cfe1d2cc6f",
+      "floor": 2,
+      "known_candidates": 6,
+      "rubric": "3费对15/28血塞牌者与8血攻4：剥夺10可直接杀攻击者；剥夺生成灵魂后观察，不把生成的随机抽取当已在手。打击6不能单杀8。"
+    },
+    {
+      "case_id": "m16",
+      "source": "recordings\\session-20261020-185952.jsonl",
+      "source_index": 13,
+      "group": "common_known",
+      "decision_id": "sha256:fe57cbf805a01496d13848cee41f8bfaa8b7d89cbf115c796e657a28e83b9475",
+      "floor": 2,
+      "known_candidates": 2,
+      "rubric": "2费，无敌人攻击：3血与12血目标；打击可确定杀3血，回旋镖随机不保证多目标斩杀。纯防御无即时收益，保留战后回血未知。"
+    },
+    {
+      "case_id": "m17",
+      "source": "recordings\\session-20261025-134935-015173.jsonl",
+      "source_index": 151,
+      "group": "complex_boundary",
+      "decision_id": "sha256:018dc4661f69fce7b86512a80399e8e40a7106cdf7a5b0c1ec6fae415421703e",
+      "floor": 17,
+      "known_candidates": 0,
+      "rubric": "首领13攻；仅打击9(易伤后13)+双防御5，非致死输出不减当前攻击。异鱼油后状态变动应观察，能力药水结果未知。"
+    },
+    {
+      "case_id": "m18",
+      "source": "recordings\\session-20261023-225610-933962.jsonl",
+      "source_index": 155,
+      "group": "complex_boundary",
+      "decision_id": "sha256:681dbc77870b3b060d134b81534a5ac76f4e6bdc5a883d86fa019e032e43f59c",
+      "floor": 33,
+      "known_candidates": 0,
+      "rubric": "0费但有0费永恒打击14；24攻对现有10盾，不能结束时漏掉零费牌，亦不能声称14伤杀259血。消耗/瓦解与格挡效果须区分。"
+    },
+    {
+      "case_id": "m19",
+      "source": "recordings\\session-20261026-205151-975671.jsonl",
+      "source_index": 99,
+      "group": "complex_boundary",
+      "decision_id": "sha256:38ae658507832d44f0752b8d324220f7516ac6c84e5fa1ed5609cfcb403a5eb7",
+      "floor": 9,
+      "known_candidates": 0,
+      "rubric": "1费精英70血易伤、攻17；打击9与全身撞击牌面3都不能杀。当前格挡0但牌面撞击3需保留观测矛盾；攻击药水可开未知选牌，不能保证抽到救命牌。"
+    },
+    {
+      "case_id": "m20",
+      "source": "recordings\\session-20261026-135016-898385.jsonl",
+      "source_index": 240,
+      "group": "complex_boundary",
+      "decision_id": "sha256:4982c750048430bd9fb340d486d552e2cf78a6e96293e8c464539195bd2d3ada",
+      "floor": 9,
+      "known_candidates": 0,
+      "rubric": "9血对第二敌人3×3，首敌2血毒6、胆怯6；需考虑毒/逃跑机制，工具未知不得当0。不能凭少量伤害宣称杀16血攻击者；抽牌顶牌后观察。"
+    },
+    {
+      "case_id": "m21",
+      "source": "recordings\\session-20261026-135016-898385.jsonl",
+      "source_index": 421,
+      "group": "complex_boundary",
+      "decision_id": "sha256:9ae2a34338ada8992510180f596979b7ef70bb68d179c127d7b0e942a0f12e3a",
+      "floor": 13,
+      "known_candidates": 0,
+      "rubric": "6费但仅三张牌：墓场守卫12格挡，对3+11攻；奥斯提输出依赖其当前HP，缺失就未知。勿把剥夺或奥斯提攻击当无条件击杀，生成后观察。"
+    },
+    {
+      "case_id": "m22",
+      "source": "recordings\\session-20261026-122350-142143.jsonl",
+      "source_index": 221,
+      "group": "complex_boundary",
+      "decision_id": "sha256:067592edc659b9f5d579a3e879cb2ffb7edce58490ca40411b46728af06f63d4",
+      "floor": 31,
+      "known_candidates": 0,
+      "rubric": "12血4盾对16攻；有0费9盾和冰霜球/集中机制。充能球、神器、闪电激发不凭空给确定数字；抽牌药水后观察。"
+    },
+    {
+      "case_id": "m23",
+      "source": "recordings\\session-20261025-200305-413991.jsonl",
+      "source_index": 71,
+      "group": "complex_boundary",
+      "decision_id": "sha256:d3bfb2bc05d1977c24d278ce362d9832676663b32d7b92645ba4992f2f630292",
+      "floor": 6,
+      "known_candidates": 0,
+      "rubric": "26血6盾、攻12、第一敌14血毒5；0费中和3再两打击6可能杀，毒/反伤/虚弱要正确归属。虚弱药物不存在，不得编造。3格挡已含脆弱不再打折。"
+    },
+    {
+      "case_id": "m24",
+      "source": "recordings\\session-20261026-122350-142143.jsonl",
+      "source_index": 133,
+      "group": "complex_boundary",
+      "decision_id": "sha256:3a9e0a56ae1c43d71f71b0294b209685c28f5bee52bd434a35871400fe0d395d",
+      "floor": 23,
+      "known_candidates": 0,
+      "rubric": "19血4盾对6攻；可生成冰霜/闪电，0费增强集中，X牌耗剩余能量。抽牌/随机后停止，不凭空假设已有充能球伤害；额外格挡需比较价值。"
+    },
+    {
+      "case_id": "m25",
+      "source": "recordings\\session-20261026-202702-348990.jsonl",
+      "source_index": 151,
+      "group": "unknown_single",
+      "decision_id": "sha256:2264dcab4625b18a3973c03f92a7767c2418f57c9547ad3dacdf40bc13166ac9",
+      "floor": 14,
+      "known_candidates": 0,
+      "rubric": "1费对22血易伤攻12，打击8(易伤12)不能杀；防御5可省血。残忍等未支持机制未知，不能套普通乘数或虚称减员。"
+    },
+    {
+      "case_id": "m26",
+      "source": "recordings\\session-20261023-221727-397571.jsonl",
+      "source_index": 81,
+      "group": "unknown_single",
+      "decision_id": "sha256:f6cc5b8519f52f0be8b2a72a4f5876bfbdaaa4e02e00e5e95dab7b03f11b2524",
+      "floor": 8,
+      "known_candidates": 0,
+      "rubric": "0能量但下一张攻击免费，全体牌25对29血不能杀；消耗区回合末重打是条件效果，不应凭空假定当前已消耗。免费只下一张，出牌后观察。"
+    },
+    {
+      "case_id": "m27",
+      "source": "recordings\\session-20261026-135016-898385.jsonl",
+      "source_index": 909,
+      "group": "unknown_single",
+      "decision_id": "sha256:06f9d2e8495c427afa8f968139506fd6e2db1d147ec41cc1f88d74ebd3eec63a",
+      "floor": 14,
+      "known_candidates": 0,
+      "rubric": "2血对17攻，只有12伤打击和保留药水；未知遗物/镀层不得当0，当前手段未保证存活，也不能把12伤说成杀30血。允许无确定解但不虚构防御。"
+    },
+    {
+      "case_id": "m28",
+      "source": "recordings\\session-20261020-185952.jsonl",
+      "source_index": 262,
+      "group": "unknown_single",
+      "decision_id": "sha256:0128ff48b62c38632e86d60daaf1d5a41f0d8802a63ec3c8e2d115b6c5feca2f",
+      "floor": 23,
+      "known_candidates": 0,
+      "rubric": "1费无攻击，敌111血易伤；打击6→9不能杀，颤栗是易伤不是伤害，3费重锤不可用。未知遗物保持未知，药水结果需观察。"
+    },
+    {
+      "case_id": "m29",
+      "source": "recordings\\session-20261023-222952-282023.jsonl",
+      "source_index": 133,
+      "group": "unknown_single",
+      "decision_id": "sha256:384e95a539555ee1865e09d4018fafaca5885184873868de24820d89ce3d6185",
+      "floor": 13,
+      "known_candidates": 0,
+      "rubric": "3费但双重/打击各2费，有绞缠限制；不能2+2透支。耸肩抽牌后观察，敌23血易伤下双重7×1.5取整每段10共20，非21或23。"
+    },
+    {
+      "case_id": "m30",
+      "source": "recordings\\session-20261026-200943-619080.jsonl",
+      "source_index": 145,
+      "group": "unknown_single",
+      "decision_id": "sha256:8050bd630deb1e78cf288315e274ecc45ebc3b8df9d8042bf6fd5373fe1237c5",
+      "floor": 15,
+      "known_candidates": 0,
+      "rubric": "敌4血攻16、玩家易伤脆弱：痛击8可击杀，不必为纯盾浪费费；战斗结束回血等未知。战斗专注抽牌后停止且不保证抽到具体牌。"
+    },
+    {
+      "case_id": "m31",
+      "source": "recordings\\session-20261025-200305-413991.jsonl",
+      "source_index": 349,
+      "group": "unknown_single",
+      "decision_id": "sha256:9b33be1bc0b10fed5c88aa0070c4f5e8edcceef15270ae09f369df689c641a13",
+      "floor": 19,
+      "known_candidates": 0,
+      "rubric": "0能量仅0费小刀4可输出，已有6盾对9攻、反伤3；小刀消耗后触发需观察，不能称4伤击杀64血。"
+    },
+    {
+      "case_id": "m32",
+      "source": "recordings\\session-20261023-225610-933962.jsonl",
+      "source_index": 263,
+      "group": "unknown_single",
+      "decision_id": "sha256:31d2395ad9342e6ec4eb290c6f9dc4ec66bdcc7425d2a8ac59687dd25d013299",
+      "floor": 38,
+      "known_candidates": 0,
+      "rubric": "已有16盾覆盖16攻，0费永恒打击可用；额外盾有长期遗物时可解释但不能捏造直接减伤。灰烬打击动态9不重复加消耗数；升级与消耗效果未知。"
+    }
+  ]
+}
