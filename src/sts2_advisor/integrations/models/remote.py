@@ -63,7 +63,7 @@ class OpenAIAdvisor:
                      (context.state_type in {'elite', 'boss'} or
                       sum(1 for enemy in enemies if (enemy.get('hp') or 0) > 0) > 1))
         thinking = ('enabled' if difficult else 'disabled') if self.adaptive_thinking else self.thinking
-        max_tokens = max(self.max_tokens, 16384) if thinking == 'enabled' else self.max_tokens
+        max_tokens = self.max_tokens
         inline = self.precompute_attacks and context.decision_type == 'combat_next_action'
         prompt_options = {'precompute_attacks': True} if inline else {}
         prompt = build_prompt(context, evidence, codex_cache=self.codex_cache, **prompt_options)
@@ -73,13 +73,24 @@ class OpenAIAdvisor:
             {"role": "system", "content": build_system_prompt(**prompt_options)},
             {"role": "user", "content": prompt},
         ]
-        tools_enabled = self.function_calling and context.decision_type == "combat_next_action" and not inline
+        dispatcher = DecisionTools(context)
+        tools_requested = self.function_calling and context.decision_type == 'combat_next_action' and not inline
+        availability = dispatcher.attack_tool_availability() if tools_requested else None
+        tools_enabled = tools_requested and availability['available']
+        if tools_requested:
+            record_event('model.tool_availability', decision_id=context.decision_id, **availability)
         if tools_enabled:
             messages[0]["content"] += (
                 "\n可调用 calculate_attack 计算单张攻击牌，只指定局面和候选动作；数值和目标修正由工具读取。"
                 "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
                 "由你结合工具结果选择行动；最后返回要求的建议 JSON。"
             )
+        elif tools_requested:
+            messages[0]['content'] += (
+                '\n本局面的 calculate_attack 无法核对任何当前合法攻击，本次不提供该工具。'
+                '这表示计算器不支持，未知不等于零，也不代表这些攻击不能打。'
+                '请依据当前观测决策，不宣称未知数值已经工具验证。限制：'
+                + '；'.join(availability['limitations']))
         logger.info(
             "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
             "json_mode=%s thinking=%s max_tokens=%s reasoning_effort=%s",
@@ -87,9 +98,7 @@ class OpenAIAdvisor:
             self.json_mode, thinking, max_tokens, self.reasoning_effort if thinking == 'enabled' else None,
         )
         try:
-            dispatcher = DecisionTools(context)
             calls_used = 0
-            length_retry_used = False
             for round_index in range(2):
                 options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index == 0 and calls_used < 8 else "none"} if tools_enabled else {}
                 options['thinking'] = thinking
@@ -97,14 +106,7 @@ class OpenAIAdvisor:
                     messages, max_tokens, context.decision_id, **options)
                 tool_calls = assistant.get("tool_calls") or []
                 if not tool_calls:
-                    if not content and finish_reason == "length" and max_tokens < 8192 and not length_retry_used:
-                        length_retry_used = True
-                        content, reasoning, finish_reason, assistant = self._complete(
-                            messages, min(max(max_tokens * 2, 2048), 8192),
-                            context.decision_id, **options)
-                        tool_calls = assistant.get("tool_calls") or []
-                    if not tool_calls:
-                        break
+                    break
                 if not tools_enabled or round_index == 1 or len(tool_calls) > 8:
                     raise ValueError("模型超出工具调用轮数或批量上限")
                 messages.append(assistant)

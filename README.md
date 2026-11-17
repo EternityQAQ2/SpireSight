@@ -133,6 +133,8 @@ OPENAI_THINKING=disabled
 
 远程后端使用官方 `openai` Python 库，也支持兼容 OpenAI Chat Completions 的服务。进程环境变量优先于 `.env`；`.env` 已被 Git 忽略。DeepSeek 默认使用 JSON Output 并关闭思考模式，避免为短决策生成冗长思维链；需要重新启用时设置 `OPENAI_THINKING=enabled`。
 
+`OPENAI_MAX_TOKENS` 严格控制每次 API 请求的生成上限，不再自动抬高或在截断后扩容；它不是整次决策的总预算，工具往返和一次校验重试仍可能发出多次请求。DeepSeek 思考强度可用 `OPENAI_REASONING_EFFORT=low`；预算过小可能只返回思考而没有最终建议，此时暂停该局面，不执行动作。计算器对所有合法攻击均不可用时，本次不提供工具并明确限制；未知不等于零，也不代表不能攻击。
+
 运行日志写入 `logs/advisor-*.log`，包含远程 API 原始响应 JSON 以及抽取后的 `content`/`reasoning` 文本，启动时自动删除超过 3 天的日志。日志不记录 API 密钥，但可能包含游戏局面与模型回答，不应公开上传。可用 `--log-retention-days` 和 `--log-dir` 调整。
 
 模型会为战斗、商店和奖励列表生成短计划：支持的战斗效果允许连续多步，通常以 `combat:end_turn` 收尾。后续状态若符合预期，程序重新核验剩余计划后复用；费用、效果和目标变化必须通过当前状态校验，抽牌、生成手牌、未支持效果、商品不可购买或界面跳转等情况会触发重新决策。

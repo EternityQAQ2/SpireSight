@@ -287,11 +287,12 @@ class TrajectoryTests(unittest.TestCase):
 
     def test_each_remote_retry_keeps_its_own_request_and_original_response(self):
         answers = [
-            SimpleNamespace(content="", reasoning_content="首轮原始推理"),
+            SimpleNamespace(content='{"candidate_id":"card:999","reason":"首轮非法候选","confidence":0.8}',
+                            reasoning_content="首轮原始推理"),
             SimpleNamespace(content='{"candidate_id":"card:2","reason":"第二次回答","confidence":0.8}'),
         ]
         responses = iter(SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=reason)], usage=None)
-                         for message, reason in zip(answers, ["length", "stop"]))
+                         for message, reason in zip(answers, ["stop", "stop"]))
 
         class FakeOpenAI:
             def __init__(self, **kwargs):
@@ -306,7 +307,7 @@ class TrajectoryTests(unittest.TestCase):
                 events = read_events(directory)
                 requests = [row["payload"] for row in events if row["event_type"] == "model.request"]
                 results = [row["payload"] for row in events if row["event_type"] == "model.response"]
-                self.assertEqual([row["request"]["max_tokens"] for row in requests], [1024, 2048])
+                self.assertEqual([row["request"]["max_tokens"] for row in requests], [1024, 1024])
                 self.assertEqual([row["call_id"] for row in requests], [row["call_id"] for row in results])
                 self.assertNotEqual(requests[0]["call_id"], requests[1]["call_id"])
                 self.assertEqual(results[0]["reasoning"], "首轮原始推理")

@@ -24,6 +24,28 @@ class DecisionTools:
     def __init__(self, context: DecisionContext):
         self.context = context
 
+    def attack_tool_availability(self) -> dict:
+        """Probe the pure calculator; a known hit is useful even if player effects are unknown."""
+        cards = {c.get('index'): c for c in self.context.player.get('hand', [])}
+        supported, checked, reasons = 0, 0, []
+        if self.context.decision_type == 'combat_next_action':
+            for candidate in self.context.candidates:
+                card = cards.get(candidate.params.get('card_index'), {})
+                if not candidate.legal or candidate.action_type != 'play_card' or card.get('type') != 'Attack':
+                    continue
+                checked += 1
+                result = self.call('calculate_attack', json.dumps({
+                    'decision_id': self.context.decision_id, 'candidate_id': candidate.candidate_id}))
+                if result.get('status') == 'calculated':
+                    supported += 1
+                else:
+                    reason = result.get('reason') or result.get('error') or '未支持该攻击'
+                    if reason not in reasons:
+                        reasons.append(reason)
+        return {'available': supported > 0, 'supported_candidates': supported,
+                'checked_candidates': checked, 'limitations': reasons[:3] or (
+                    [] if checked else ['当前没有可核对的合法攻击'])}
+
     def call(self, name: str, arguments: str) -> dict:
         try:
             if name not in {"evaluate_combat_plan", "calculate_attack"}:

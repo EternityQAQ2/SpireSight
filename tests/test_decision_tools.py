@@ -149,10 +149,10 @@ class DecisionToolTests(unittest.TestCase):
             backend.advise(ctx, [])
         self.assertEqual([r['extra_body']['thinking']['type'] for r in requests],
                          ['enabled', 'disabled', 'enabled', 'enabled', 'disabled'])
-        self.assertEqual([r['max_tokens'] for r in requests], [16384, 1024, 16384, 16384, 1024])
+        self.assertEqual([r['max_tokens'] for r in requests], [1024] * 5)
         self.assertEqual(backend.thinking, 'disabled')
 
-    def test_truncated_normal_request_retries_once_with_more_output(self):
+    def test_truncated_normal_request_respects_configured_cap(self):
         from dataclasses import replace
         requests = []
         def create(**kwargs):
@@ -161,10 +161,10 @@ class DecisionToolTests(unittest.TestCase):
                 return NS(choices=[NS(message=NS(content='', reasoning_content='思考中'), finish_reason='length')])
             return self.response()
         backend = self.backend(create, thinking='disabled', max_tokens=4096)
-        advice = backend.advise(replace(self.ctx, state_type='elite'), [])
-        self.assertEqual(advice.candidate_id, 'card:2')
-        self.assertEqual([r['max_tokens'] for r in requests], [4096, 8192])
-        self.assertEqual([r['extra_body']['thinking']['type'] for r in requests], ['disabled', 'disabled'])
+        with self.assertRaisesRegex(ValueError, 'reasoning_content'):
+            backend.advise(replace(self.ctx, state_type='elite'), [])
+        self.assertEqual([r['max_tokens'] for r in requests], [4096])
+        self.assertEqual([r['extra_body']['thinking']['type'] for r in requests], ['disabled'])
 
     def test_deepseek_uses_low_effort_only_when_thinking_enabled(self):
         from dataclasses import replace

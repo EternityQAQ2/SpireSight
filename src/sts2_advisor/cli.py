@@ -188,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
         fallback = RuleAdvisor()
         print(
             f"远程模型：{backend.model_name}（最大输出 {backend.max_tokens} tokens，"
-            f"思考模式 {'按战斗局面自动切换（困难战斗至少16384输出）' if backend.adaptive_thinking else backend.thinking or '服务默认'}）"
+            f"思考模式 {'按战斗局面自动切换（使用配置输出上限）' if backend.adaptive_thinking else backend.thinking or '服务默认'}）"
         )
     else:
         backend = RuleAdvisor()
