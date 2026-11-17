@@ -63,8 +63,17 @@ def main(argv: list[str] | None = None) -> int:
                 },
             }
         )
+    if args.source.suffix == '.jsonl':
+        from sts2_advisor.integrations.knowledge.examples import load_examples
+        records = load_examples(args.source)
     if args.store in {"json", "both"}:
         args.output.parent.mkdir(parents=True, exist_ok=True)
+        # Worked examples have stable reviewed IDs; upsert them in fallback too.
+        if args.source.suffix == '.jsonl' and args.output.exists():
+            ids = {r['evidence_id'] for r in records}
+            old = [json.loads(s) for s in args.output.read_text(encoding='utf-8').splitlines() if s.strip()]
+            args.output.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n'
+                for r in old if r.get('evidence_id') not in ids), encoding='utf-8')
         with args.output.open("a", encoding="utf-8") as handle:
             for record in records:
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -98,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
                     "enemies": ",".join(record["metadata"]["enemies"]),
                     "license": record["metadata"]["license"],
                     "review_status": record["metadata"]["review_status"],
+                    **{k: v for k, v in record['metadata'].items()
+                       if k in {'kind', 'mechanism', 'source_encounter', 'review_basis'}},
                 }
                 for record in records
             ],

@@ -6,6 +6,7 @@ from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.embeddings import chroma_embedding_function
 from sts2_advisor.integrations.knowledge.common import build_query, metadata_matches
+from sts2_advisor.integrations.knowledge.examples import EXAMPLE_KIND, matching_mechanisms, select_examples
 
 
 class ChromaRetriever:
@@ -20,7 +21,7 @@ class ChromaRetriever:
         )
 
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
-        if self.collection.count() == 0:
+        if top_k <= 0 or self.collection.count() == 0:
             return []
         query = build_query(context)
         candidate_k = max(top_k * 3, 12)
@@ -28,6 +29,16 @@ class ChromaRetriever:
                      candidate_k=candidate_k)
         result = self.collection.query(query_texts=[query], n_results=candidate_k)
         record_event("retrieval.raw_result", provider="chroma", result=result)
+        # A small overfetch can contain only other characters/bosses/build
+        # advice. Retry locally with a bounded pool rather than let an example
+        # silently replace a SQLite fact because no guide slot existed.
+        raw_metas = (result.get('metadatas') or [[]])[0]
+        expanded_k = min(max(48, top_k * 6), self.collection.count())
+        if expanded_k > candidate_k and not any(
+                metadata_matches(m or {}, context) and (m or {}).get('kind') != EXAMPLE_KIND
+                for m in raw_metas):
+            result = self.collection.query(query_texts=[query], n_results=expanded_k)
+            record_event('retrieval.raw_result', provider='chroma_expanded', result=result)
         evidences: list[Evidence] = []
         ids = (result.get("ids") or [[]])[0]
         documents = (result.get("documents") or [[]])[0]
@@ -45,4 +56,17 @@ class ChromaRetriever:
                     metadata=dict(metadata),
                 )
             )
-        return evidences[:top_k]
+        mechanisms = matching_mechanisms(context)
+        if mechanisms:
+            # Same collection and embedding model; no new store or startup writes.
+            examples = self.collection.query(query_texts=[query], n_results=1, where={
+                '$and': [{'kind': EXAMPLE_KIND}, {'review_status': 'verified_arithmetic'},
+                         {'mechanism': {'$in': mechanisms}},
+                         {'character': {'$in': ['all', str(context.player.get('character', ''))]}}]})
+            record_event('retrieval.raw_result', provider='chroma_examples', result=examples)
+            for ident, text, metadata in zip((examples.get('ids') or [[]])[0],
+                    (examples.get('documents') or [[]])[0], (examples.get('metadatas') or [[]])[0]):
+                metadata = metadata or {}
+                evidences.insert(0, Evidence(str(ident), str(text), str(metadata.get('source_title', ident)),
+                                             str(metadata.get('source_url', '')), dict(metadata)))
+        return select_examples(context, evidences, top_k)

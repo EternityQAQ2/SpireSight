@@ -21,6 +21,8 @@
 | 模型接入 | integrations/models/remote.py、local.py、rules.py：SDK传输和响应处理，不放战术规则 |
 | 知识接入 | integrations/knowledge/factory.py、sqlite.py、chroma.py、lexical.py、seeds.py |
 | 检索相关性 | integrations/knowledge/relevance.py：纯查询组织和排序；common.py保留共用接口 |
+| 核实案例 | integrations/knowledge/examples.py：观察机制过滤、最多替换一个guide；data/decision_examples.jsonl经现有ingest写入原Chroma集合/JSON回退，不新增数据库 |
+| 修复反馈 | decision/feedback.py：组织原计划/资源模拟/未执行标记和最多两个合法起点；沿用backend反馈字符串，不选战术；game/combat/resources.py可选trace复用原计算 |
 | 记录统计 | recording/session.py、trajectory.py、stats.py、logging.py |
 | 离线工具 | evals/、tools/、training/：与在线执行分开，实验不隐式操作游戏 |
 

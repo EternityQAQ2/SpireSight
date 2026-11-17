@@ -138,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--chroma-path", type=Path, default=Path("data/chroma"))
     parser.add_argument("--jsonl", type=Path, default=Path("data/knowledge.jsonl"))
     parser.add_argument("--store", choices=("json", "chroma", "both"), default="both")
+    parser.add_argument('--examples', type=Path, default=Path('data/decision_examples.jsonl'))
     parser.add_argument(
         "--decision-type", action="append", default=[],
         help="全局覆盖默认决策类型（默认按目录类别），可重复",
@@ -214,6 +215,14 @@ def main(argv: list[str] | None = None) -> int:
             "--license", item["license"],
         ]
         if ingest_main(argv_out) != 0:
+            failed += 1
+
+    if args.examples.is_file():
+        from sts2_advisor.integrations.knowledge.examples import load_examples
+        print(f"[案例] {len(load_examples(args.examples))} 个已核实案例：{args.examples}")
+        if not args.dry_run and ingest_main([
+            str(args.examples), '--store', args.store, '--output', str(args.jsonl),
+            '--chroma-path', str(args.chroma_path)]) != 0:
             failed += 1
 
     if args.dry_run:

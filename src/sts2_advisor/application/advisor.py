@@ -198,7 +198,8 @@ class AdvisorService:
                     advice = validate_advice(proposed, context, evidence)
                     break
                 except AdviceValidationError as exc:
-                    feedback = str(exc)
+                    from sts2_advisor.decision.feedback import build_repair_feedback
+                    feedback = build_repair_feedback(context, proposed, str(exc))
                     record_event('decision.plan_invalid', reason=str(exc), attempt=attempt + 1)
                     if attempt:
                         raise

@@ -29,7 +29,7 @@ def _known_statuses(entity: dict, allowed: set[str]) -> bool:
         for s in statuses)
 
 
-def known_resource_error(context: DecisionContext, ids: list[str]) -> str | None:
+def known_resource_error(context: DecisionContext, ids: list[str], *, trace: list[dict] | None = None) -> str | None:
     """Return only provable errors. None means valid OR not sufficiently known.
 
     This does not certify a target, damage, or executable prefix. A draw, unknown
@@ -71,15 +71,31 @@ def known_resource_error(context: DecisionContext, ids: list[str]) -> str | None
         if star_cost and (type(stars) is not int or stars < 0):
             return None
         if cost > energy:
+            if trace is not None:
+                trace.append(dict(step=pos, candidate_id=ident, energy_before=energy,
+                                  cost=cost, energy_after=None, status='insufficient_energy'))
             return f'计划第{pos}步 {ident} 需{cost}能量，按已确认步骤仅剩{energy}；请重新选择计划'
         if star_cost and star_cost > stars:
+            if trace is not None:
+                trace.append(dict(step=pos, candidate_id=ident, energy_before=energy,
+                                  cost=cost, energy_after=None, stars_before=stars,
+                                  star_cost=star_cost, stars_after=None, status='insufficient_stars'))
             return f'计划第{pos}步需{star_cost}辉星，按已确认步骤仅剩{stars}；请重新选择计划'
+        energy_before = energy
+        stars_before = stars
         energy -= cost
         if star_cost:
             stars -= star_cost
         used.add(index)
+        unknown_after = known_effect(card) in {None, 'shrug', 'pommel'}
+        if trace is not None:
+            trace.append(dict(step=pos, candidate_id=ident, energy_before=energy_before,
+                              cost=cost, energy_after=None if unknown_after else energy,
+                              energy_after_payment=energy, stars_before=stars_before,
+                              star_cost=star_cost, stars_after=None if unknown_after else stars,
+                              status='observe_after_action' if unknown_after else 'known_resource_step'))
         # Includes draw/selection, energy gain and next-attack discounts. No
         # static summation beyond them, even if the model supplied a long tail.
-        if known_effect(card) in {None, 'shrug', 'pommel'}:
+        if unknown_after:
             return None
     return None

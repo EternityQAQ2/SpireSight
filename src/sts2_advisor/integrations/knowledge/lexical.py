@@ -1,6 +1,8 @@
 """Dependency-free JSONL lexical retrieval and explicit retrieval opt-out."""
 from __future__ import annotations
 
+from sts2_advisor.integrations.knowledge.examples import select_examples
+
 import math
 from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
@@ -36,4 +38,4 @@ class JsonKnowledgeRetriever:
         scored.sort(key=lambda pair: pair[0], reverse=True)
         record_event("retrieval.ranked", provider="json", score_kind="lexical_overlap",
                      hits=[{"score": score, "evidence": evidence.to_dict()} for score, evidence in scored[:top_k]])
-        return [evidence for _, evidence in scored[:top_k]]
+        return select_examples(context, [evidence for _, evidence in scored], top_k)
