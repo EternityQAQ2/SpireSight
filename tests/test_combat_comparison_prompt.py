@@ -7,6 +7,15 @@ from sts2_advisor.game.state import build_decision_context
 
 
 class CombatComparisonPromptTests(unittest.TestCase):
+    def test_plans_are_optional_and_resources_follow_sequential_actual_costs(self):
+        prompt = build_system_prompt()
+        self.assertNotIn('应规划 2 至 8 步', prompt)
+        self.assertNotIn('计划中所有出牌的费用总和不得超过当前能量', prompt)
+        self.assertIn('不要求凑多步', prompt)
+        self.assertIn('逐步实际费用', prompt)
+        self.assertIn('减费', prompt)
+        self.assertIn('回能', prompt)
+
     def test_system_loads_versioned_skill(self):
         prompt = build_system_prompt()
         self.assertIn('# STS2 Decider', prompt)

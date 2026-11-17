@@ -12,6 +12,7 @@
 | 单张算术 | game/combat/calculator.py：指定攻击直接伤害及有限的玩家即时生命/格挡；额外结算未知时单独标记。纯函数，无数据库/模型/游戏I/O |
 | 回合末验证 | game/combat/forecast.py：复用现有模拟器投影完整确定计划，保守验证致死及一条存活见证；由check_plan转成错误反馈，不返回替代动作 |
 | 观测数值 | game/combat/facts.py：敌人ID与威胁、立即生命成本、格挡前荆棘、当前费用有效期；未知不伪造0，不据此选择战术 |
+| 资源预检 | game/combat/resources.py：在资源变化可确认时证明能量/辉星或重复用牌错误，不依赖伤害模拟；decision/plan_check.py仅在原检查因完整机制未知截断时调用，复用现有一次重决策 |
 | 已支持回合效果 | game/combat/effects.py、simulation.py、search.py：有限效果与搜索，不能当通用模拟器 |
 | 决策输入 | decision/context.py、metrics.py、prompts.py：图鉴缓存、当前数值、提示词和skill加载；可选首轮攻击结果复用原calculator，不实现第二套算术 |
 | 决策输出 | decision/parsing.py、validation.py、plan_check.py、plans.py：解析、校验、资源/目标与复用 |

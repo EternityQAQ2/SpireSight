@@ -6,9 +6,22 @@ from sts2_advisor.contracts import PlanCheck
 from sts2_advisor.game.combat.effects import energy_cost, energy_gain, known_effect
 from sts2_advisor.game.combat.simulation import initial_state, play
 from sts2_advisor.game.combat.forecast import check_end_turn
+from sts2_advisor.game.combat.resources import known_resource_error
+
+
+UNSIMULATED_BOUNDARY = '当前机制无法精确试算，执行一步后重新观测'
 
 
 def check_plan(context: DecisionContext, ids: list[str]) -> PlanCheck:
+    checked = _check_observed_prefix(context, ids)
+    if not checked.error and checked.boundary == UNSIMULATED_BOUNDARY:
+        error = known_resource_error(context, ids)
+        if error:
+            return PlanCheck([], error)
+    return checked
+
+
+def _check_observed_prefix(context: DecisionContext, ids: list[str]) -> PlanCheck:
     """Walk resource use even without effect support. Stop after unknown effects.
 
     A prefix crossing draw/random/selection cannot be certified just by adding
@@ -72,6 +85,6 @@ def check_plan(context: DecisionContext, ids: list[str]) -> PlanCheck:
             if not any(e.hp > 0 for e in state.enemies):
                 return PlanCheck(prefix, boundary="战斗结束，后续动作无效" if pos < len(ids) - 1 else None)
         elif len(ids) > 1:
-            return PlanCheck(prefix, boundary="当前机制无法精确试算，执行一步后重新观测")
+            return PlanCheck(prefix, boundary=UNSIMULATED_BOUNDARY)
         energy += energy_gain(card)
     return PlanCheck(prefix)
