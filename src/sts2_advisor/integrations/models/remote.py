@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import json
+import re
+import time
+import uuid
+from dataclasses import replace
 from sts2_advisor.contracts import Advice, DecisionContext, Evidence
-from sts2_advisor.decision.prompts import build_system_prompt, build_prompt
+from sts2_advisor.developer import dev_block, dev_request, dev_section, dev_usage
+from sts2_advisor.decision.prompts import SYSTEM_PROMPT, build_prompt
 from sts2_advisor.decision.context import CodexCache
 from sts2_advisor.decision.tools import DecisionTools, TOOL_SCHEMAS
 from sts2_advisor.decision.parsing import extract_json_object, advice_from_payload
@@ -15,6 +20,8 @@ logger = get_logger("model")
 
 class OpenAIAdvisor:
     """Remote OpenAI or OpenAI-compatible chat completion backend."""
+
+    USER_AGENT = "spiresight-advisor/0.1"
 
     def __init__(
         self,
@@ -29,7 +36,8 @@ class OpenAIAdvisor:
         adaptive_thinking: bool = False,
         reasoning_effort: str | None = None,
         function_calling: bool = True,
-        precompute_attacks: bool = False,
+        opencode_mode: bool = False,
+        session_id: str | None = None,
     ) -> None:
         if not api_key:
             raise ValueError("缺少 OPENAI_API_KEY，请在项目根目录 .env 中配置。")
@@ -41,6 +49,13 @@ class OpenAIAdvisor:
         kwargs = {"api_key": api_key, "timeout": timeout}
         if base_url:
             kwargs["base_url"] = base_url
+        if opencode_mode:
+            # OpenCode Go 要求客户端用自身 User-Agent 标识，并为每个会话发送
+            # 稳定的 x-opencode-session，用于路由与提示词缓存；SDK 默认 UA 会被拒。
+            kwargs["default_headers"] = {
+                "User-Agent": self.USER_AGENT,
+                "x-opencode-session": session_id or str(uuid.uuid4()),
+            }
         self.client = OpenAI(**kwargs)
         self.codex_cache = CodexCache()
         self.model_name = model_name
@@ -52,7 +67,7 @@ class OpenAIAdvisor:
         if self.reasoning_effort not in {None, 'low', 'high', 'max'}:
             raise ValueError('reasoning_effort 必须为 low、high 或 max')
         self.function_calling = function_calling
-        self.precompute_attacks = precompute_attacks
+        self.opencode_mode = opencode_mode
 
     def advise_with_feedback(self, context: DecisionContext, evidence: list[Evidence], feedback: str) -> Advice:
         return self.advise(context, evidence, feedback=feedback)
@@ -85,12 +100,14 @@ class OpenAIAdvisor:
                 "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
                 "由你结合工具结果选择行动；最后返回要求的建议 JSON。"
             )
-        elif tools_requested:
-            messages[0]['content'] += (
-                '\n本局面的 calculate_attack 无法核对任何当前合法攻击，本次不提供该工具。'
-                '这表示计算器不支持，未知不等于零，也不代表这些攻击不能打。'
-                '请依据当前观测决策，不宣称未知数值已经工具验证。限制：'
-                + '；'.join(availability['limitations']))
+        dev_block(
+            "提示词", f"完整提示词（openai · {self.model_name}）",
+            {"system": messages[0]["content"], "user": prompt},
+            backend="openai", model=self.model_name, max_tokens=self.max_tokens,
+            json_mode=self.json_mode, thinking=self.thinking,
+            prompt_chars=len(prompt), evidence_count=len(evidence),
+            function_calling=tools_enabled,
+        )
         logger.info(
             "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
             "json_mode=%s thinking=%s max_tokens=%s reasoning_effort=%s",
@@ -99,15 +116,24 @@ class OpenAIAdvisor:
         )
         try:
             calls_used = 0
-            for round_index in range(2):
-                options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index == 0 and calls_used < 8 else "none"} if tools_enabled else {}
-                options['thinking'] = thinking
+            attempts = 0
+            tool_results = []
+            for round_index in range(4):
+                options = {"tools": TOOL_SCHEMAS, "tool_choice": "auto" if round_index < 3 and calls_used < 8 else "none"} if tools_enabled else {}
+                attempts += 1
                 content, reasoning, finish_reason, assistant = self._complete(
-                    messages, max_tokens, context.decision_id, **options)
+                    messages, self.max_tokens, context.decision_id, attempt=attempts, **options)
                 tool_calls = assistant.get("tool_calls") or []
                 if not tool_calls:
-                    break
-                if not tools_enabled or round_index == 1 or len(tool_calls) > 8:
+                    if not content and finish_reason == "length" and self.max_tokens < 4096:
+                        attempts += 1
+                        content, reasoning, finish_reason, assistant = self._complete(
+                            messages, min(max(self.max_tokens * 2, 2048), 4096),
+                            context.decision_id, attempt=attempts, **options)
+                        tool_calls = assistant.get("tool_calls") or []
+                    if not tool_calls:
+                        break
+                if not tools_enabled or round_index == 3 or len(tool_calls) > 8:
                     raise ValueError("模型超出工具调用轮数或批量上限")
                 messages.append(assistant)
                 for call in tool_calls:
@@ -124,6 +150,7 @@ class OpenAIAdvisor:
                 "remote_request_failed model=%s decision_id=%s error_type=%s",
                 self.model_name, context.decision_id, type(exc).__name__,
             )
+            dev_section("模型请求失败", type(exc).__name__, fields={"message": str(exc)})
             raise RuntimeError(f"远程模型请求失败：{exc}") from exc
         if not content:
             logger.warning(
@@ -134,12 +161,31 @@ class OpenAIAdvisor:
             if reasoning:
                 detail = "；服务只返回了 reasoning_content，可能是输出上限过小或模型接口不兼容"
             raise ValueError(f"远程模型返回了空内容{detail}，请查看运行日志")
-        return advice_from_payload(extract_json_object(content), context)
+        try:
+            payload = extract_json_object(content)
+        except ValueError as exc:
+            dev_section("模型解析", "JSON 解析失败", fields={
+                "error": str(exc), "finish_reason": finish_reason,
+            })
+            raise
+        advice = advice_from_payload(payload, context)
+        if tool_results:
+            chosen = dispatcher.evaluate(advice.plan_candidate_ids or [advice.candidate_id])
+            claim = re.search(r"秒杀|斩杀|可击杀|仅\d+点伤害|只受\d+点伤害", advice.reason)
+            contradicted = bool(chosen.get("exact") and chosen.get("projection") and
+                                chosen["projection"]["kills"] == 0 and
+                                re.search(r"秒杀|斩杀|可击杀", advice.reason))
+            if claim and (not chosen.get("exact") or contradicted):
+                advice = replace(advice, reason="试算结果不支持原定斩杀判断；先执行一步并重新观测。" if contradicted else
+                                 "当前机制无法完整试算；先执行一步并重新观测。",
+                                 confidence=min(advice.confidence, 0.4),
+                                 warnings=advice.warnings + ["计划试算不支持或与斩杀断言矛盾，原理由中的确定性判断已撤回"])
+        return advice
 
     def _complete(
         self, messages: list[dict], max_tokens: int, decision_id: str,
         *, tools: list[dict] | None = None, tool_choice: str = "auto",
-        thinking: str | None = None,
+        attempt: int | None = None,
     ) -> tuple[str, str, str | None, dict]:
         request = {
             "model": self.model_name,
@@ -151,12 +197,16 @@ class OpenAIAdvisor:
             request.update(tools=tools, tool_choice=tool_choice)
         if self.json_mode:
             request["response_format"] = {"type": "json_object"}
-        if thinking in {"enabled", "disabled"}:
-            request["extra_body"] = {"thinking": {"type": thinking}}
-        if thinking == 'enabled' and self.reasoning_effort:
-            request['reasoning_effort'] = self.reasoning_effort
+        if self.thinking in {"enabled", "disabled"}:
+            request["extra_body"] = {"thinking": {"type": self.thinking}}
+        dev_request(
+            "openai", self.model_name, attempt=attempt, max_tokens=max_tokens,
+            json_mode=self.json_mode, thinking=self.thinking,
+        )
         with recorded_call("model", backend="openai", request=request) as call_id:
+            started = time.monotonic()
             response = self.client.chat.completions.create(**request)
+            duration_ms = (time.monotonic() - started) * 1000
             record_event("model.raw_response", call_id=call_id,
                          response=json.loads(serialize_openai_response(response)))
             choice = response.choices[0]
@@ -195,6 +245,21 @@ class OpenAIAdvisor:
                 decision_id,
                 json.dumps(content, ensure_ascii=False),
                 json.dumps(reasoning, ensure_ascii=False),
+            )
+            blocks = {}
+            if reasoning:
+                blocks["reasoning"] = reasoning
+            blocks["content"] = content
+            dev_block(
+                "模型输出", f"openai 第 {attempt} 次响应" if attempt else "openai 响应",
+                blocks,
+                call_id=call_id, attempt=attempt, finish_reason=finish_reason,
+                max_tokens=max_tokens, duration_ms=round(duration_ms, 1),
+                content_chars=len(content), reasoning_chars=len(reasoning),
+            )
+            dev_usage(
+                "模型", usage_data, backend="openai", model=self.model_name,
+                attempt=attempt, duration_ms=duration_ms, call_id=call_id,
             )
             assistant = {"role": "assistant", "content": content or None}
             tool_calls = getattr(message, "tool_calls", None)

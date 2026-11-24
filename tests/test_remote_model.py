@@ -11,7 +11,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from sts2_advisor.cli import choose_backend_interactively, environment_flag, load_environment
+from sts2_advisor.cli import (
+    choose_backend_interactively, environment_flag, load_environment, main,
+)
 from sts2_advisor.contracts import Evidence
 from sts2_advisor.recording.logging import close_logging, configure_logging
 from sts2_advisor.integrations.models.remote import OpenAIAdvisor, cache_token_counts
@@ -33,6 +35,87 @@ class RemoteModelTests(unittest.TestCase):
         with patch.dict(os.environ, {"FEATURE": "invalid"}, clear=True):
             with self.assertRaisesRegex(ValueError, "true 或 false"):
                 environment_flag("FEATURE", False)
+
+    def test_opencode_mode_sends_required_headers(self) -> None:
+        captured = {}
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        with patch.dict(sys.modules, {"openai": SimpleNamespace(OpenAI=FakeOpenAI)}):
+            OpenAIAdvisor(
+                "remote-model", api_key="secret",
+                base_url="https://opencode.ai/inference/go/openai/v1",
+                opencode_mode=True, session_id="session-1",
+            )
+
+        headers = captured["default_headers"]
+        self.assertEqual(headers["User-Agent"], OpenAIAdvisor.USER_AGENT)
+        self.assertEqual(headers["x-opencode-session"], "session-1")
+        self.assertEqual(captured["base_url"], "https://opencode.ai/inference/go/openai/v1")
+
+    def test_opencode_mode_off_leaves_sdk_headers_untouched(self) -> None:
+        captured = {}
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        with patch.dict(sys.modules, {"openai": SimpleNamespace(OpenAI=FakeOpenAI)}):
+            OpenAIAdvisor("remote-model", api_key="secret", base_url="https://example.test/v1")
+
+        self.assertNotIn("default_headers", captured)
+
+    def test_opencode_mode_generates_one_stable_session_per_advisor(self) -> None:
+        import uuid
+
+        sessions = []
+
+        class FakeOpenAI:
+            def __init__(self, **kwargs):
+                sessions.append(kwargs["default_headers"]["x-opencode-session"])
+
+        with patch.dict(sys.modules, {"openai": SimpleNamespace(OpenAI=FakeOpenAI)}):
+            OpenAIAdvisor("remote-model", api_key="secret", opencode_mode=True)
+            OpenAIAdvisor("remote-model", api_key="secret", opencode_mode=True)
+
+        self.assertEqual(len(sessions), 2)
+        self.assertNotEqual(sessions[0], sessions[1])
+        for value in sessions:
+            self.assertEqual(str(uuid.UUID(value)), value)
+
+    def test_cli_reads_opencode_mode_environment_variable(self) -> None:
+        captured = {}
+
+        class FakeAdvisor:
+            def __init__(self, *args, **kwargs):
+                captured.update(kwargs)
+
+        class FakeService:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def run_once(self, **kwargs):
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(os.environ, {
+                "OPENAI_MODEL": "remote-model",
+                "OPENAI_API_KEY": "secret",
+                "OPENAI_BASE_URL": "https://opencode.ai/inference/go/openai/v1",
+                "OPENCODE_MODE": "true",
+            }, clear=True), \
+                 patch("sts2_advisor.cli.load_environment", lambda *_: None), \
+                 patch("sts2_advisor.cli.OpenAIAdvisor", FakeAdvisor), \
+                 patch("sts2_advisor.cli.AdvisorService", FakeService):
+                code = main([
+                    "--backend", "openai", "--no-record", "--rag", "none",
+                    "--log-dir", directory,
+                ])
+
+        self.assertEqual(code, 0)
+        self.assertTrue(captured["opencode_mode"])
 
     def test_reads_deepseek_and_openai_cache_usage(self) -> None:
         self.assertEqual(

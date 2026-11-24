@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.contracts import Retriever
+from sts2_advisor.developer import dev_section
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.common import parse_evidence_lines, metadata_matches
 
@@ -35,4 +36,7 @@ class SeedInjectingRetriever:
         ]
         if matched:
             record_event("retrieval.seeds", evidence_ids=[item.evidence_id for item in matched])
+            dev_section("检索注入", "内置基线规则", fields={
+                "evidence_ids": [item.evidence_id for item in matched],
+            })
         return matched + evidence

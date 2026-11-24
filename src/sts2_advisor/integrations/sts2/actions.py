@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from sts2_advisor.integrations.sts2.client import Sts2ActionRejectedError, Sts2ApiError, Sts2RestClient
 from sts2_advisor.contracts import Advice, DecisionContext
+from sts2_advisor.developer import dev_section
 from sts2_advisor.game.state import build_decision_context
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.decision.validation import AdviceValidationError
@@ -53,6 +54,9 @@ def action(
     action_id = str(uuid4())
     record_event("action.request", action_id=action_id, method="POST",
                  endpoint="/api/v1/singleplayer", request={"action": action_type, **params})
+    dev_section("动作请求", action_type, fields={
+        "action_id": action_id, "request": {"action": action_type, **params},
+    })
     try:
         with urlopen(request, timeout=client.timeout) as response:
             raw = response.read()
@@ -79,6 +83,9 @@ def action(
         raise Sts2ApiError("STS2MCP 返回了无效 JSON") from exc
     record_event("action.response", action_id=action_id, http_status=status, response=payload,
                  raw_body=raw.decode("utf-8"))
+    dev_section("动作响应", action_type, fields={
+        "action_id": action_id, "http_status": status, "response": payload,
+    })
     if not isinstance(payload, dict):
         raise Sts2ApiError("STS2MCP 响应必须是 JSON 对象")
     if payload.get("status") != "ok":

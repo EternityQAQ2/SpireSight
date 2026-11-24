@@ -8,6 +8,7 @@ from contextlib import closing
 from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.contracts import Retriever
+from sts2_advisor.developer import dev_section
 from sts2_advisor.recording.trajectory import record_event
 from sts2_advisor.integrations.knowledge.lexical import NullRetriever
 from sts2_advisor.integrations.knowledge.relevance import entity_name, rank_facts
@@ -98,9 +99,14 @@ class SqliteFactsRetriever:
         identifiers, labels = sorted(ids), sorted(names)
         record_event("retrieval.query", provider="sqlite", path=str(self.path), top_k=top_k,
                      identifiers=identifiers, names=labels, tables=list(self.TABLES))
+        dev_section("检索查询", "sqlite 实体查询", fields={
+            "path": str(self.path), "top_k": top_k,
+            "identifiers": identifiers, "names": labels,
+        })
         id_slots = ",".join("?" for _ in identifiers) or "NULL"
         name_slots = ",".join("?" for _ in labels) or "NULL"
         facts: list[Evidence] = []
+        table_counts: dict[str, int] = {}
         with closing(sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
             connection.row_factory = sqlite3.Row
             for table in self.TABLES:
@@ -109,6 +115,7 @@ class SqliteFactsRetriever:
                     f"OR name IN ({name_slots}) ORDER BY id",
                     identifiers + labels,
                 ).fetchall()
+                table_counts[table] = len(rows)
                 record_event("retrieval.rows", provider="sqlite", table=table,
                              rows=[dict(row) for row in rows])
                 # 同名卡牌可能属于不同角色，已有准确 ID 时优先使用对应记录。
@@ -143,8 +150,12 @@ class SqliteFactsRetriever:
                 item['pages'].append(row['page_name'])
             interactions = [Evidence(
                 f"sqlite:interactions:{row['id']}", row["description"], "灰机 Wiki：效果交互",
-                metadata={"table": "interactions", "pages": row['pages']},
-            ) for row in ({'id': key, **value} for key, value in grouped.items())]
+                metadata={"table": "interactions"},
+            ) for row in rows]
+        dev_section("检索事实", "sqlite 命中统计", fields={
+            "table_row_counts": {key: value for key, value in table_counts.items() if value},
+            "interaction_count": len(interactions),
+        })
 
         facts = rank_facts(context, interactions + facts)
         record_event('retrieval.ranked', provider='sqlite', hits=[
