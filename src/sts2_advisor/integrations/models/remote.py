@@ -33,6 +33,8 @@ class OpenAIAdvisor:
         max_tokens: int = 1024,
         json_mode: bool = True,
         thinking: str | None = None,
+        adaptive_thinking: bool = False,
+        reasoning_effort: str | None = None,
         function_calling: bool = True,
         opencode_mode: bool = False,
         session_id: str | None = None,
@@ -60,21 +62,43 @@ class OpenAIAdvisor:
         self.max_tokens = max_tokens
         self.json_mode = json_mode
         self.thinking = thinking
+        self.adaptive_thinking = adaptive_thinking
+        self.reasoning_effort = reasoning_effort or ('low' if base_url and 'deepseek.com' in base_url.lower() else None)
+        if self.reasoning_effort not in {None, 'low', 'high', 'max'}:
+            raise ValueError('reasoning_effort 必须为 low、high 或 max')
         self.function_calling = function_calling
         self.opencode_mode = opencode_mode
 
-    def advise(self, context: DecisionContext, evidence: list[Evidence]) -> Advice:
-        prompt = build_prompt(context, evidence, codex_cache=self.codex_cache)
+    def advise_with_feedback(self, context: DecisionContext, evidence: list[Evidence], feedback: str) -> Advice:
+        return self.advise(context, evidence, feedback=feedback)
+
+    def advise(self, context: DecisionContext, evidence: list[Evidence], *, feedback: str = '') -> Advice:
+        enemies = (context.situation.get('battle') or {}).get('enemies', [])
+        difficult = (context.decision_type == 'combat_next_action' and
+                     (context.state_type in {'elite', 'boss'} or
+                      sum(1 for enemy in enemies if (enemy.get('hp') or 0) > 0) > 1))
+        thinking = ('enabled' if difficult else 'disabled') if self.adaptive_thinking else self.thinking
+        max_tokens = self.max_tokens
+        inline = self.precompute_attacks and context.decision_type == 'combat_next_action'
+        prompt_options = {'precompute_attacks': True} if inline else {}
+        prompt = build_prompt(context, evidence, codex_cache=self.codex_cache, **prompt_options)
+        if feedback:
+            prompt += '\n上次计划无法执行：' + feedback + '。请重新选择合法计划。'
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": build_system_prompt(**prompt_options)},
             {"role": "user", "content": prompt},
         ]
-        tools_enabled = self.function_calling and context.decision_type == "combat_next_action"
+        dispatcher = DecisionTools(context)
+        tools_requested = self.function_calling and context.decision_type == 'combat_next_action' and not inline
+        availability = dispatcher.attack_tool_availability() if tools_requested else None
+        tools_enabled = tools_requested and availability['available']
+        if tools_requested:
+            record_event('model.tool_availability', decision_id=context.decision_id, **availability)
         if tools_enabled:
             messages[0]["content"] += (
-                "\n可调用 evaluate_combat_plan 试算你提出的动作序列。费用、斩杀或防御存在疑问时先调用；"
-                "比较不同方案后自行决策。工具只计算，不执行动作。exact=false 时不能把未知当作零。"
-                "最多 3 轮、8 次工具调用，最后仍须返回要求的建议 JSON。"
+                "\n可调用 calculate_attack 计算单张攻击牌，只指定局面和候选动作；数值和目标修正由工具读取。"
+                "手牌显示伤害已包含力量，不要重复加算。仅按工具返回的当前单步结果推断，未知不等于零。"
+                "由你结合工具结果选择行动；最后返回要求的建议 JSON。"
             )
         dev_block(
             "提示词", f"完整提示词（openai · {self.model_name}）",
@@ -86,12 +110,11 @@ class OpenAIAdvisor:
         )
         logger.info(
             "remote_request model=%s decision_id=%s prompt_chars=%s evidence_count=%s "
-            "json_mode=%s thinking=%s max_tokens=%s",
+            "json_mode=%s thinking=%s max_tokens=%s reasoning_effort=%s",
             self.model_name, context.decision_id, len(prompt), len(evidence),
-            self.json_mode, self.thinking, self.max_tokens,
+            self.json_mode, thinking, max_tokens, self.reasoning_effort if thinking == 'enabled' else None,
         )
         try:
-            dispatcher = DecisionTools(context)
             calls_used = 0
             attempts = 0
             tool_results = []
@@ -118,9 +141,8 @@ class OpenAIAdvisor:
                     result = ({"ok": False, "error": "工具预算已耗尽，请返回最终建议"} if calls_used >= 8 else
                               dispatcher.call(function.get("name", ""), function.get("arguments", "")))
                     calls_used += 1
-                    tool_results.append(result)
                     record_event("model.tool_result", decision_id=context.decision_id,
-                                 tool_call_id=call["id"], name=function.get("name"), result=result)
+                                 tool_call_id=call["id"], name=function.get("name"), arguments=function.get("arguments"), result=result)
                     messages.append({"role": "tool", "tool_call_id": call["id"],
                                      "content": json.dumps(result, ensure_ascii=False)})
         except Exception as exc:

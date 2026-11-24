@@ -87,9 +87,9 @@ def load_events(db: Path) -> list[dict]:
                 result = (json.loads(row["payload_json"]).get("result") or {})
             except json.JSONDecodeError:
                 result = {}
-            item["tool_exact"] = bool(result.get("exact"))
+            item["tool_exact"] = bool(result.get("exact")) or result.get("status") == "calculated"
             item["tool_error"] = result.get("ok") is False
-            item["tool_blockers"] = result.get("unsupported_mechanics") or []
+            item["tool_blockers"] = result.get("unsupported_mechanics") or ([result["reason"]] if result.get("status") == "unknown" and result.get("reason") else [])
             item["tool_undetailed"] = not item["tool_exact"] and not item["tool_blockers"]
         events.append(item)
     return events

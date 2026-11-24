@@ -7,15 +7,16 @@ import json
 from sts2_advisor.contracts import DecisionContext
 from sts2_advisor.decision.plan_check import check_plan
 from sts2_advisor.game.combat.simulation import initial_state, play, outcome, unsupported_mechanics
+from sts2_advisor.game.combat.calculator import calculate
 
 
 TOOL_SCHEMAS = [{"type": "function", "function": {
-    "name": "evaluate_combat_plan",
-    "description": "试算你提出的出牌顺序；只计算，不执行游戏动作。可多次调用以比较攻击、防御、清随从方案。未支持的效果明确报告未知。",
+    "name": "calculate_attack",
+    "description": "核对当前一张攻击牌对指定目标的直接伤害，同时返回已验证的玩家即时生命与格挡；未知保持unknown。不执行动作，不预测敌人回合或回合末。手牌伤害已包含玩家力量等修正。",
     "parameters": {"type": "object", "properties": {
         "decision_id": {"type": "string", "description": "当前输入的 decision_id"},
-        "candidate_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 8},
-    }, "required": ["decision_id", "candidate_ids"], "additionalProperties": False},
+        "candidate_id": {"type": "string", "description": "当前攻击候选 ID"},
+    }, "required": ["decision_id", "candidate_id"], "additionalProperties": False},
 }}]
 
 
@@ -23,13 +24,48 @@ class DecisionTools:
     def __init__(self, context: DecisionContext):
         self.context = context
 
+    def attack_tool_availability(self) -> dict:
+        """Probe the pure calculator; a known hit is useful even if player effects are unknown."""
+        cards = {c.get('index'): c for c in self.context.player.get('hand', [])}
+        supported, checked, reasons = 0, 0, []
+        if self.context.decision_type == 'combat_next_action':
+            for candidate in self.context.candidates:
+                card = cards.get(candidate.params.get('card_index'), {})
+                if not candidate.legal or candidate.action_type != 'play_card' or card.get('type') != 'Attack':
+                    continue
+                checked += 1
+                result = self.call('calculate_attack', json.dumps({
+                    'decision_id': self.context.decision_id, 'candidate_id': candidate.candidate_id}))
+                if result.get('status') == 'calculated':
+                    supported += 1
+                else:
+                    reason = result.get('reason') or result.get('error') or '未支持该攻击'
+                    if reason not in reasons:
+                        reasons.append(reason)
+        return {'available': supported > 0, 'supported_candidates': supported,
+                'checked_candidates': checked, 'limitations': reasons[:3] or (
+                    [] if checked else ['当前没有可核对的合法攻击'])}
+
     def call(self, name: str, arguments: str) -> dict:
         try:
-            if name != "evaluate_combat_plan":
+            if name not in {"evaluate_combat_plan", "calculate_attack"}:
                 raise ValueError("未知工具")
             if len(arguments) > 8192:
                 raise ValueError("参数过长")
             args = json.loads(arguments)
+            if name == "calculate_attack":
+                if self.context.decision_type != "combat_next_action":
+                    raise ValueError("仅支持战斗局面")
+                required = {'decision_id', 'candidate_id'}
+                if not isinstance(args, dict) or not required <= set(args) or set(args) - (required | {'expected_hp_after'}):
+                    raise ValueError("参数必须包含 decision_id、candidate_id；历史预估字段可选")
+                if args["decision_id"] != self.context.decision_id:
+                    raise ValueError("过期 decision_id")
+                expected = args.get('expected_hp_after')
+                if (not isinstance(args["candidate_id"], str) or
+                        ('expected_hp_after' in args and (type(expected) is not int or expected < 0))):
+                    raise ValueError("攻击参数类型错误")
+                return calculate(self.context, args["candidate_id"], expected)
             if not isinstance(args, dict) or set(args) != {"decision_id", "candidate_ids"}:
                 raise ValueError("需要 decision_id 和 candidate_ids")
             if args["decision_id"] != self.context.decision_id:

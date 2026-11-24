@@ -1,0 +1,23 @@
+{
+  "review_method": "assistant non-blind arithmetic review against frozen rubrics; not human gold or game outcome",
+  "source_results": "tmp/decision-improvements-20261117-api.json",
+  "retrieval": [
+    {"case_id": "discount-transfer", "same_first_action": false, "baseline_reason_error": false, "example_reason_error": true, "finding": "新首步采用猛攻减费组合的起点；未给完整组合，不能确认后续执行。新理由把护盾说成各张抵消；旧明确说本回合无易伤来源，选择残酷作长期铺垫并保留两张打击能量，没有明确算术错。仅按当前输出更接近组合，不证明新选择长期更优。"},
+    {"case_id": "slippery-transfer", "same_first_action": true, "baseline_reason_error": true, "example_reason_error": true, "finding": "两组都先突破，但都把滑溜1误算为每次减1，并声称各8伤杀13/14血。真实该次各失去1HP并耗层，三个敌人均存活；新例未纠正该机制错误。"},
+    {"case_id": "vulnerable-buffing-target", "same_first_action": true, "baseline_reason_error": true, "example_reason_error": true, "finding": "拆卸攻击易伤目标应命中两次各12，总24可杀17HP，两组理由都只算12。新组还说防御只省2血，实际从7损到2损，省5；动作本身可杀成长敌，不能凭理由算错就判攻击目标必错。"},
+    {"case_id": "existing-block-critical-hp", "same_first_action": true, "baseline_reason_error": false, "example_reason_error": false, "finding": "均防御再铁斩波，总盾16挡12；均正确比较只铁斩波+打击会掉1。新命中易伤击杀例而非当前盾例，相关性仍粗。"},
+    {"case_id": "kill-current-attacker", "same_first_action": true, "baseline_reason_error": true, "example_reason_error": true, "finding": "均两次打击分别杀攻击者和塞牌者，行动合理。旧说完美打击省1费，新说2费完美打击后剩1费，均错（观察仅2能量）；杀攻击者也不一定还掉4。"},
+    {"case_id": "partial-block", "same_first_action": true, "baseline_reason_error": false, "example_reason_error": false, "finding": "均防御后结束，正确算已有5+新5盾，12攻仍掉2，优于只攻击掉7。"}
+  ],
+  "repair": [
+    {"case_id": "repair-1", "baseline_delivered": false, "structured_delivered": true, "finding": "旧反馈后重复6费计划，再次拒绝；新反馈后只选3费重锤，资源合法。但理由泛说配合缓慢加成，没有证明全局最优输出。"},
+    {"case_id": "repair-2", "baseline_delivered": false, "structured_delivered": true, "structured_reason_error": true, "finding": "旧反馈重复6费计划。新JSON给三张1费卡，资源可付；实际仅交付一张铁斩波待观测。理由仍在三张1费后加入3费重锤，并同时承认不能同回合，不能叫完整理解费用。"}
+  ],
+  "limitations": [
+    "六个新遭遇来自五份录制；排除既有固定题及教学案例同录制楼层，不是六个完整对局。",
+    "两个修复输入是同一旧m07遭遇的两份人为冻结非法计划，仅测试一次反馈链路。",
+    "每组每题只一次、非盲助手评审；无平均楼层、胜率、完整回合成本或稳定战术增益证据。",
+    "两首轮组共用新增有界攻略补取，不能把结果归因成6d509b0完整版本到当前完整版本的差异。",
+    "没有根据失败更改案例/评分后重跑；未知仍未知，不按模拟器未报错判完整计划已被证明正确。"
+  ]
+}

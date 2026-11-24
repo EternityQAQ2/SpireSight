@@ -1,0 +1,974 @@
+{
+  "elite": {
+    "state_type": "elite",
+    "battle": {
+      "round": 3,
+      "turn": "player",
+      "is_play_phase": true,
+      "enemies": [
+        {
+          "entity_id": "BYGONE_EFFIGY_0",
+          "combat_id": 1,
+          "name": "旧日雕像",
+          "hp": 49,
+          "max_hp": 127,
+          "block": 0,
+          "status": [
+            {
+              "id": "SLOW_POWER",
+              "name": "缓慢",
+              "amount": 20,
+              "type": "Debuff",
+              "description": "你在本回合内每打出一张牌，该敌人本回合从攻击牌中受到的伤害增加10%。（受到伤害增加20%）",
+              "keywords": []
+            },
+            {
+              "id": "VULNERABLE_POWER",
+              "name": "易伤",
+              "amount": 3,
+              "type": "Debuff",
+              "description": "3回合内，受到的攻击伤害增加50%。",
+              "keywords": []
+            },
+            {
+              "id": "STRENGTH_POWER",
+              "name": "力量",
+              "amount": 10,
+              "type": "Buff",
+              "description": "增加攻击牌造成的伤害值10点。",
+              "keywords": []
+            }
+          ],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "23",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成23点伤害。"
+            }
+          ]
+        }
+      ]
+    },
+    "run": {
+      "act": 1,
+      "floor": 7,
+      "ascension": 0
+    },
+    "player": {
+      "character": "铁甲战士",
+      "hp": 73,
+      "max_hp": 80,
+      "block": 0,
+      "energy": 1,
+      "max_energy": 3,
+      "hand": [
+        {
+          "id": "POMMEL_STRIKE",
+          "name": "剑柄打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。 抽1张牌。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 0,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "DEFEND_IRONCLAD",
+          "name": "防御",
+          "type": "Skill",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "格挡",
+              "description": "在下个回合前，阻挡伤害。"
+            }
+          ],
+          "index": 1,
+          "target_type": "Self",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 2,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 3,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "UPPERCUT",
+          "name": "上勾拳",
+          "type": "Attack",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成13点伤害。 给予1层虚弱。 给予1层易伤。",
+          "rarity": "Uncommon",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "虚弱",
+              "description": "虚弱的生物造成的攻击伤害减少25%。"
+            },
+            {
+              "name": "易伤",
+              "description": "易伤的生物从攻击中受到的伤害增加50%。"
+            }
+          ],
+          "index": 4,
+          "target_type": "AnyEnemy",
+          "can_play": false,
+          "unplayable_reason": "EnergyCostTooHigh"
+        }
+      ],
+      "draw_pile_count": 1,
+      "discard_pile_count": 10,
+      "exhaust_pile_count": 2,
+      "draw_pile": [
+        {
+          "name": "埋葬",
+          "cost": "4",
+          "star_cost": null,
+          "description": "造成52点伤害。"
+        }
+      ],
+      "discard_pile": [
+        {
+          "name": "双重打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成8点伤害两次。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成10点伤害。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。"
+        },
+        {
+          "name": "飞剑回旋镖",
+          "cost": "1",
+          "star_cost": null,
+          "description": "随机对敌人造成3点伤害3次。"
+        },
+        {
+          "name": "剥夺",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成18点伤害。 将一张灵魂加入你的抽牌堆。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "痛击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成13点伤害。 给予2层易伤。"
+        }
+      ],
+      "exhaust_pile": [
+        {
+          "name": "战栗",
+          "cost": "1",
+          "star_cost": null,
+          "description": "给予3层易伤。 消耗。"
+        },
+        {
+          "name": "灵魂",
+          "cost": "0",
+          "star_cost": null,
+          "description": "抽2张牌。 消耗。"
+        }
+      ],
+      "gold": 21,
+      "status": [],
+      "relics": [
+        {
+          "id": "BURNING_BLOOD",
+          "name": "燃烧之血",
+          "description": "在战斗结束时，回复6点生命。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "KALEIDOSCOPE",
+          "name": "万花筒",
+          "description": "拾起时，获得2次来自其他角色的卡牌奖励。",
+          "counter": null,
+          "keywords": []
+        }
+      ],
+      "potions": [],
+      "max_potion_slots": 3
+    }
+  },
+  "group": {
+    "state_type": "elite",
+    "battle": {
+      "round": 4,
+      "turn": "player",
+      "is_play_phase": true,
+      "enemies": [
+        {
+          "entity_id": "WRIGGLER_0",
+          "combat_id": 2,
+          "name": "扭动虫",
+          "hp": 19,
+          "max_hp": 19,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "6",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成6点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_1",
+          "combat_id": 3,
+          "name": "扭动虫",
+          "hp": 20,
+          "max_hp": 20,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Buff",
+              "label": "",
+              "title": "强化",
+              "description": "这个敌人将要使用一个强化效果。"
+            },
+            {
+              "type": "StatusCard",
+              "label": "1",
+              "title": "策略",
+              "description": "这个敌人将会给你1张状态牌。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_2",
+          "combat_id": 4,
+          "name": "扭动虫",
+          "hp": 21,
+          "max_hp": 21,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "6",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成6点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_3",
+          "combat_id": 5,
+          "name": "扭动虫",
+          "hp": 18,
+          "max_hp": 18,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Buff",
+              "label": "",
+              "title": "强化",
+              "description": "这个敌人将要使用一个强化效果。"
+            },
+            {
+              "type": "StatusCard",
+              "label": "1",
+              "title": "策略",
+              "description": "这个敌人将会给你1张状态牌。"
+            }
+          ]
+        }
+      ]
+    },
+    "run": {
+      "act": 1,
+      "floor": 15,
+      "ascension": 0
+    },
+    "player": {
+      "character": "铁甲战士",
+      "hp": 57,
+      "max_hp": 80,
+      "block": 0,
+      "energy": 3,
+      "max_energy": 3,
+      "hand": [
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成8点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 0,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "TWIN_STRIKE",
+          "name": "双重打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成7点伤害两次。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 1,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "REAVE",
+          "name": "剥夺",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成12点伤害。 将一张灵魂加入你的抽牌堆。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "灵魂",
+              "description": "抽2张牌。 消耗。"
+            }
+          ],
+          "index": 2,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "SWORD_BOOMERANG",
+          "name": "飞剑回旋镖",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "随机对敌人造成5点伤害3次。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 3,
+          "target_type": "RandomEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "INFECTION",
+          "name": "感染",
+          "type": "Status",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。",
+          "rarity": "Status",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "不能被打出",
+              "description": "不能被打出的牌无法被打出。"
+            }
+          ],
+          "index": 4,
+          "target_type": "None",
+          "can_play": false,
+          "unplayable_reason": "HasUnplayableKeyword"
+        }
+      ],
+      "draw_pile_count": 15,
+      "discard_pile_count": 0,
+      "exhaust_pile_count": 2,
+      "draw_pile": [
+        {
+          "name": "痛击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成8点伤害。 给予2层易伤。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "剑柄打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成13点伤害。 抽1张牌。"
+        },
+        {
+          "name": "埋葬",
+          "cost": "4",
+          "star_cost": null,
+          "description": "造成54点伤害。"
+        },
+        {
+          "name": "战鼓",
+          "cost": "1",
+          "star_cost": null,
+          "description": "抽2张牌。 这张牌被消耗时，获得[ironclad_energy_icon.png][ironclad_energy_icon.png]。"
+        },
+        {
+          "name": "上勾拳",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成13点伤害。 给予1层虚弱。 给予1层易伤。"
+        },
+        {
+          "name": "感染",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。"
+        },
+        {
+          "name": "感染",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。"
+        },
+        {
+          "name": "愧疚",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在5场战斗后从你的牌组中移除。"
+        }
+      ],
+      "discard_pile": [],
+      "exhaust_pile": [
+        {
+          "name": "灵魂",
+          "cost": "0",
+          "star_cost": null,
+          "description": "抽2张牌。 消耗。"
+        },
+        {
+          "name": "战栗",
+          "cost": "1",
+          "star_cost": null,
+          "description": "给予3层易伤。 消耗。"
+        }
+      ],
+      "gold": 135,
+      "status": [
+        {
+          "id": "STRENGTH_POWER",
+          "name": "力量",
+          "amount": 2,
+          "type": "Buff",
+          "description": "增加攻击牌造成的伤害值2点。",
+          "keywords": []
+        }
+      ],
+      "relics": [
+        {
+          "id": "BURNING_BLOOD",
+          "name": "燃烧之血",
+          "description": "在战斗结束时，回复6点生命。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "KALEIDOSCOPE",
+          "name": "万花筒",
+          "description": "拾起时，获得2次来自其他角色的卡牌奖励。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "LANTERN",
+          "name": "灯笼",
+          "description": "在每场战斗的第一回合获得[ironclad_energy_icon.png]。",
+          "counter": null,
+          "keywords": [
+            {
+              "name": "能量",
+              "description": "能量用于打出你手牌中的卡牌。"
+            }
+          ]
+        },
+        {
+          "id": "POTION_BELT",
+          "name": "药水腰带",
+          "description": "拾起时，获得2个药水栏位。",
+          "counter": null,
+          "keywords": []
+        }
+      ],
+      "potions": [
+        {
+          "id": "BEETLE_JUICE",
+          "name": "甲虫汁",
+          "description": "敌人的攻击在下4个回合中造成的伤害减少30%。",
+          "slot": 0,
+          "can_use_in_combat": true,
+          "target_type": "AnyEnemy",
+          "keywords": []
+        }
+      ],
+      "max_potion_slots": 5
+    }
+  },
+  "group_after": {
+    "state_type": "elite",
+    "battle": {
+      "round": 4,
+      "turn": "player",
+      "is_play_phase": true,
+      "enemies": [
+        {
+          "entity_id": "WRIGGLER_0",
+          "combat_id": 2,
+          "name": "扭动虫",
+          "hp": 19,
+          "max_hp": 19,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "6",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成6点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_1",
+          "combat_id": 3,
+          "name": "扭动虫",
+          "hp": 20,
+          "max_hp": 20,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Buff",
+              "label": "",
+              "title": "强化",
+              "description": "这个敌人将要使用一个强化效果。"
+            },
+            {
+              "type": "StatusCard",
+              "label": "1",
+              "title": "策略",
+              "description": "这个敌人将会给你1张状态牌。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_2",
+          "combat_id": 4,
+          "name": "扭动虫",
+          "hp": 21,
+          "max_hp": 21,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Attack",
+              "label": "6",
+              "title": "攻势",
+              "description": "这个敌人将要攻击造成6点伤害。"
+            }
+          ]
+        },
+        {
+          "entity_id": "WRIGGLER_3",
+          "combat_id": 5,
+          "name": "扭动虫",
+          "hp": 6,
+          "max_hp": 18,
+          "block": 0,
+          "status": [],
+          "intents": [
+            {
+              "type": "Buff",
+              "label": "",
+              "title": "强化",
+              "description": "这个敌人将要使用一个强化效果。"
+            },
+            {
+              "type": "StatusCard",
+              "label": "1",
+              "title": "策略",
+              "description": "这个敌人将会给你1张状态牌。"
+            }
+          ]
+        }
+      ]
+    },
+    "run": {
+      "act": 1,
+      "floor": 15,
+      "ascension": 0
+    },
+    "player": {
+      "character": "铁甲战士",
+      "hp": 57,
+      "max_hp": 80,
+      "block": 0,
+      "energy": 2,
+      "max_energy": 3,
+      "hand": [
+        {
+          "id": "STRIKE_IRONCLAD",
+          "name": "打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成8点伤害。",
+          "rarity": "Basic",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 0,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "TWIN_STRIKE",
+          "name": "双重打击",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成7点伤害两次。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 1,
+          "target_type": "AnyEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "SWORD_BOOMERANG",
+          "name": "飞剑回旋镖",
+          "type": "Attack",
+          "cost": "1",
+          "star_cost": null,
+          "description": "随机对敌人造成5点伤害3次。",
+          "rarity": "Common",
+          "is_upgraded": false,
+          "keywords": [],
+          "index": 2,
+          "target_type": "RandomEnemy",
+          "can_play": true,
+          "unplayable_reason": null
+        },
+        {
+          "id": "INFECTION",
+          "name": "感染",
+          "type": "Status",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。",
+          "rarity": "Status",
+          "is_upgraded": false,
+          "keywords": [
+            {
+              "name": "不能被打出",
+              "description": "不能被打出的牌无法被打出。"
+            }
+          ],
+          "index": 3,
+          "target_type": "None",
+          "can_play": false,
+          "unplayable_reason": "HasUnplayableKeyword"
+        }
+      ],
+      "draw_pile_count": 16,
+      "discard_pile_count": 1,
+      "exhaust_pile_count": 2,
+      "draw_pile": [
+        {
+          "name": "痛击",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成8点伤害。 给予2层易伤。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "防御",
+          "cost": "1",
+          "star_cost": null,
+          "description": "获得5点格挡。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成9点伤害。"
+        },
+        {
+          "name": "打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成6点伤害。"
+        },
+        {
+          "name": "剑柄打击",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成13点伤害。 抽1张牌。"
+        },
+        {
+          "name": "埋葬",
+          "cost": "4",
+          "star_cost": null,
+          "description": "造成54点伤害。"
+        },
+        {
+          "name": "战鼓",
+          "cost": "1",
+          "star_cost": null,
+          "description": "抽2张牌。 这张牌被消耗时，获得[ironclad_energy_icon.png][ironclad_energy_icon.png]。"
+        },
+        {
+          "name": "上勾拳",
+          "cost": "2",
+          "star_cost": null,
+          "description": "造成13点伤害。 给予1层虚弱。 给予1层易伤。"
+        },
+        {
+          "name": "灵魂",
+          "cost": "0",
+          "star_cost": null,
+          "description": "抽2张牌。 消耗。"
+        },
+        {
+          "name": "感染",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。"
+        },
+        {
+          "name": "感染",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在你的回合结束时，如果这张牌在你的手牌中，你受到3点伤害。"
+        },
+        {
+          "name": "愧疚",
+          "cost": "0",
+          "star_cost": null,
+          "description": "不能被打出。 在5场战斗后从你的牌组中移除。"
+        }
+      ],
+      "discard_pile": [
+        {
+          "name": "剥夺",
+          "cost": "1",
+          "star_cost": null,
+          "description": "造成12点伤害。 将一张灵魂加入你的抽牌堆。"
+        }
+      ],
+      "exhaust_pile": [
+        {
+          "name": "灵魂",
+          "cost": "0",
+          "star_cost": null,
+          "description": "抽2张牌。 消耗。"
+        },
+        {
+          "name": "战栗",
+          "cost": "1",
+          "star_cost": null,
+          "description": "给予3层易伤。 消耗。"
+        }
+      ],
+      "gold": 135,
+      "status": [
+        {
+          "id": "STRENGTH_POWER",
+          "name": "力量",
+          "amount": 2,
+          "type": "Buff",
+          "description": "增加攻击牌造成的伤害值2点。",
+          "keywords": []
+        }
+      ],
+      "relics": [
+        {
+          "id": "BURNING_BLOOD",
+          "name": "燃烧之血",
+          "description": "在战斗结束时，回复6点生命。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "KALEIDOSCOPE",
+          "name": "万花筒",
+          "description": "拾起时，获得2次来自其他角色的卡牌奖励。",
+          "counter": null,
+          "keywords": []
+        },
+        {
+          "id": "LANTERN",
+          "name": "灯笼",
+          "description": "在每场战斗的第一回合获得[ironclad_energy_icon.png]。",
+          "counter": null,
+          "keywords": [
+            {
+              "name": "能量",
+              "description": "能量用于打出你手牌中的卡牌。"
+            }
+          ]
+        },
+        {
+          "id": "POTION_BELT",
+          "name": "药水腰带",
+          "description": "拾起时，获得2个药水栏位。",
+          "counter": null,
+          "keywords": []
+        }
+      ],
+      "potions": [
+        {
+          "id": "BEETLE_JUICE",
+          "name": "甲虫汁",
+          "description": "敌人的攻击在下4个回合中造成的伤害减少30%。",
+          "slot": 0,
+          "can_use_in_combat": true,
+          "target_type": "AnyEnemy",
+          "keywords": []
+        }
+      ],
+      "max_potion_slots": 5
+    }
+  }
+}

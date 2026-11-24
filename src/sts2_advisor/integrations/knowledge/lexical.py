@@ -1,13 +1,14 @@
 """Dependency-free JSONL lexical retrieval and explicit retrieval opt-out."""
 from __future__ import annotations
 
-import json
+from sts2_advisor.integrations.knowledge.examples import select_examples
+
 import math
 from pathlib import Path
 from sts2_advisor.contracts import DecisionContext, Evidence
 from sts2_advisor.developer import dev_section
 from sts2_advisor.recording.trajectory import record_event
-from sts2_advisor.integrations.knowledge.common import parse_evidence_lines, tokenize, metadata_matches
+from sts2_advisor.integrations.knowledge.common import parse_evidence_lines, tokenize, metadata_matches, build_query
 
 
 class NullRetriever:
@@ -23,7 +24,7 @@ class JsonKnowledgeRetriever:
         self.records: list[Evidence] = parse_evidence_lines(path, "知识库")
 
     def retrieve(self, context: DecisionContext, top_k: int = 6) -> list[Evidence]:
-        query_terms = tokenize(json.dumps(context.to_dict(), ensure_ascii=False))
+        query_terms = tokenize(build_query(context))
         record_event("retrieval.query", provider="json", path=str(self.path), top_k=top_k,
                      query_terms=sorted(query_terms), decision_type=context.decision_type,
                      character=context.player.get("character"))

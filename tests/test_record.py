@@ -106,7 +106,8 @@ class TrajectoryTests(unittest.TestCase):
                 self.assertEqual([request[0] for request in requests], ["GET", "GET", "GET"])
                 recorder.close()
 
-    def test_invalid_remote_answer_and_actual_request_survive_rule_fallback(self):
+    def test_invalid_remote_answer_is_recorded_without_rule_fallback(self):
+        from sts2_advisor.decision.validation import AdviceValidationError
         invalid_text = '{"candidate_id":"does-not-exist","reason":"原始回答","confidence":0.8}'
         response_data = {
             "id": "response-raw", "choices": [{"message": {"content": invalid_text}, "finish_reason": "stop"}],
@@ -126,7 +127,8 @@ class TrajectoryTests(unittest.TestCase):
                 backend = OpenAIAdvisor("teacher", api_key="do-not-record-me", thinking="disabled")
             with action_api() as (client, _):
                 service, recorder = self.service(directory, client, backend, fallback_backend=RuleAdvisor())
-                service.run_once()
+                with self.assertRaises(AdviceValidationError):
+                    service.run_once()
                 events = read_events(directory)
                 request = next(row["payload"] for row in events if row["event_type"] == "model.request")
                 answer = next(row["payload"] for row in events if row["event_type"] == "model.response")
@@ -134,7 +136,8 @@ class TrajectoryTests(unittest.TestCase):
                 self.assertEqual([message["role"] for message in request["request"]["messages"]], ["system", "user"])
                 self.assertEqual(answer["content"], invalid_text)
                 self.assertEqual(answer["raw_response"], response_data)
-                self.assertIn("decision.fallback", [row["event_type"] for row in events])
+                self.assertNotIn("decision.fallback", [row["event_type"] for row in events])
+                self.assertEqual(sum(row['event_type'] == 'decision.plan_invalid' for row in events), 2)
                 self.assertNotIn("do-not-record-me", json.dumps(events))
                 recorder.close()
 
@@ -180,7 +183,8 @@ class TrajectoryTests(unittest.TestCase):
                 events = read_events(directory)
                 query = next(row["payload"] for row in events if row["event_type"] == "retrieval.query")
                 ranked = next(row["payload"] for row in events if row["event_type"] == "retrieval.ranked")
-                self.assertIn("monster", query["query_terms"])
+                self.assertIn("combat_next_action", query["query_terms"])
+                self.assertIn("防御", query["query_terms"])
                 self.assertGreater(ranked["hits"][0]["score"], 0)
                 self.assertEqual(ranked["hits"][0]["evidence"]["text"], "monster 防御")
                 recorder.close()
@@ -198,7 +202,17 @@ class TrajectoryTests(unittest.TestCase):
                 recorder.close("error")
 
     def test_plan_reuse_links_original_step_without_fake_model_or_retrieval_calls(self):
+        from sts2_advisor.game.combat.simulation import initial_state, play
+        from sts2_advisor.game.state import build_decision_context
+        context = build_decision_context(COMBAT)
+        first = next(c for c in context.candidates if c.action_type == 'play_card')
+        card = next(c for c in context.player['hand'] if c['index'] == first.params['card_index'])
+        forecast = play(initial_state(context), first, card)
         changed = copy.deepcopy(COMBAT)
+        changed['player']['hp'], changed['player']['block'] = forecast.hp, forecast.block
+        for enemy in changed['battle']['enemies']:
+            predicted = next(e for e in forecast.enemies if e.entity_id == enemy['entity_id'])
+            enemy['hp'], enemy['block'] = predicted.hp, predicted.block
         playable = [card for card in changed["player"]["hand"] if card.get("can_play")]
         first_index = playable[0]["index"]
         changed["player"]["hand"] = [card for card in changed["player"]["hand"] if card["index"] != first_index]
@@ -273,11 +287,12 @@ class TrajectoryTests(unittest.TestCase):
 
     def test_each_remote_retry_keeps_its_own_request_and_original_response(self):
         answers = [
-            SimpleNamespace(content="", reasoning_content="首轮原始推理"),
+            SimpleNamespace(content='{"candidate_id":"card:999","reason":"首轮非法候选","confidence":0.8}',
+                            reasoning_content="首轮原始推理"),
             SimpleNamespace(content='{"candidate_id":"card:2","reason":"第二次回答","confidence":0.8}'),
         ]
         responses = iter(SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason=reason)], usage=None)
-                         for message, reason in zip(answers, ["length", "stop"]))
+                         for message, reason in zip(answers, ["stop", "stop"]))
 
         class FakeOpenAI:
             def __init__(self, **kwargs):
@@ -292,7 +307,7 @@ class TrajectoryTests(unittest.TestCase):
                 events = read_events(directory)
                 requests = [row["payload"] for row in events if row["event_type"] == "model.request"]
                 results = [row["payload"] for row in events if row["event_type"] == "model.response"]
-                self.assertEqual([row["request"]["max_tokens"] for row in requests], [1024, 2048])
+                self.assertEqual([row["request"]["max_tokens"] for row in requests], [1024, 1024])
                 self.assertEqual([row["call_id"] for row in requests], [row["call_id"] for row in results])
                 self.assertNotEqual(requests[0]["call_id"], requests[1]["call_id"])
                 self.assertEqual(results[0]["reasoning"], "首轮原始推理")

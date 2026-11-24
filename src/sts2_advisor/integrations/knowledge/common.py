@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 from sts2_advisor.contracts import DecisionContext, Evidence
+from sts2_advisor.integrations.knowledge.relevance import decision_query
 
 
 def parse_evidence_lines(path: Path, kind: str) -> list[Evidence]:
@@ -33,16 +34,7 @@ def parse_evidence_lines(path: Path, kind: str) -> list[Evidence]:
 
 
 def build_query(context: DecisionContext) -> str:
-    player = context.player
-    situation = context.situation
-    return " ".join(
-        [
-            context.decision_type,
-            str(player.get("character", "")),
-            f"act {context.run.get('act', '')}",
-            json.dumps(situation, ensure_ascii=False),
-        ]
-    )
+    return decision_query(context)
 
 
 def metadata_matches(metadata: dict[str, Any], context: DecisionContext) -> bool:

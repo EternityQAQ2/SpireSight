@@ -1,0 +1,85 @@
+{
+  "baseline": "2e1ecab",
+  "token_budget": 500000,
+  "request_budget": 96,
+  "expected_decisions": 24,
+  "repetitions": 1,
+  "fixtures_sha256": "f3f5795f2ef6677a0c8e173587e005b547eec2aa52c78f34f6ceeb59f6ac3881",
+  "cases": [
+    {
+      "case_id": "m01",
+      "context_sha256": "ca2d34a84987250d78466d3a0e47071a2583eed494b7d81f70a341fd0b00430f",
+      "review_rubric": "首步能否处理13血10攻目标；滑溜15血首次只掉1；理由数值另计，不据短计划强推完整回合。"
+    },
+    {
+      "case_id": "m04",
+      "context_sha256": "f0752e29e0999c6d78e6c743d090db3dd9b759ef078d601f27b2005d0305b1a3",
+      "review_rubric": "能否利用无情猛攻下一张免费杀42血攻击者；Hemo19+Unrel18+Strike10或Unrel18+freeHemo19+Strike10均3费。减费后须观察，杀21血路线可行但需记录不同来袭损失。"
+    },
+    {
+      "case_id": "m06",
+      "context_sha256": "724073b98ecbff7cdd68e1bdc25976edfaa5d4809a5614a330b36c2396c42d05",
+      "review_rubric": "两张防御动作10盾后是否还利用剩1费燃烧；首步防御/铁斩波/燃烧均可，不强判唯一次序。"
+    },
+    {
+      "case_id": "m07",
+      "context_sha256": "82cdd4ffd97ab8a01b0a5eb962b8920b99c37634d74490cba9bdffe51cde087e",
+      "review_rubric": "三能量下6费原计划应被拒绝并最多重决策一次；实际首步改变只记可行性，不无依据断定睡眠醒来后的掉血。复制药水等先使用后观察合法。"
+    },
+    {
+      "case_id": "m11",
+      "context_sha256": "9f6d0f4505de57657ca136748dbeefd2e1f3397c9f1ff69017401a1aec9cb81f",
+      "review_rubric": "1费攻10与防5的换血取舍单列待判断，不用模型理由更长当改善；结构ID冲突与重试另计。"
+    },
+    {
+      "case_id": "m14",
+      "context_sha256": "2eb770b5c75856aa3470aad699869a61890f487f340738bf61800481bde38ae6",
+      "review_rubric": "两防御完全挡6攻，打击+防御换1HP获6伤可有合理权衡；不可称任意当前攻击可杀18。"
+    },
+    {
+      "case_id": "m17",
+      "context_sha256": "1f2eddaff1d2f8550ec472b8c9987bf48e90dcda9f4aba995dc6b20242432927",
+      "review_rubric": "打击加两防御是可行3费；未知遗物不当0。完整结束计划无代价漏一防御可省5HP；短计划不等于会漏防。"
+    },
+    {
+      "case_id": "m22",
+      "context_sha256": "fd7970cb5ed79f2bc00ba6f71d93c5d9f5728e3274c0f3f8e40e8a016f6a8741",
+      "review_rubric": "0费9盾求生与冰霜充能球均有价值；未知球/循环不当0，避免宣称不打盾必死。抽牌后观察。"
+    },
+    {
+      "case_id": "m24",
+      "context_sha256": "16a294715b38ab7c8adde3464573339d771d37e3393723982b0d50114f43f711",
+      "review_rubric": "已有4盾对6攻，加5盾或0费虚弱均能解决，热修复第一步可以但未打虚弱前4不能挡6。只热修复短计划不当完整回合。"
+    },
+    {
+      "case_id": "m26",
+      "context_sha256": "8295046ceaa91a8e97b3e9bc7a2b19c03452eadb8e613a2a9535f179d22cd3a8",
+      "review_rubric": "当前能量0仍有0费全体25可输出，29血剩4；不能错用免费次数，消耗区回合末重打仅作条件。结束回合前漏该免费攻击记录明显机会损失。"
+    },
+    {
+      "case_id": "m29",
+      "context_sha256": "d85b8a34fc956d573a6eb98e76ce5762095542c1cb32bca84d1202aecfed3f9c",
+      "review_rubric": "当前2费双重每段floor(7*1.5)=10总20；不能与2费打击连出。输出/耸肩防御可取舍，抽牌后观察，不据未杀就判错。"
+    },
+    {
+      "case_id": "m32",
+      "context_sha256": "e787d227d34f24b05ced663c671e525c9087d7088c8f197ba87feda4a08130bc",
+      "review_rubric": "16盾覆盖16攻，先燃烧后两免费攻击有已知输出收益；原完整结束计划若漏免费攻击/正收益剩能量动作另记；未知遗物不伪造精确回合HP。"
+    }
+  ],
+  "primary_metrics": [
+    "actual delivered first action, feasibility and defensible tradeoff",
+    "original full-plan resource error",
+    "delivery success/redecision/token/time"
+  ],
+  "secondary_metrics": [
+    "reason and warning arithmetic errors",
+    "observation boundary suffix"
+  ],
+  "limitations": [
+    "reused diagnostic cases, one response per arm per case; not heldout or floor measurement",
+    "budget2M prior round closed; this500k is separate, never combined",
+    "short incomplete plan not graded as if model ended turn",
+    "no test changes/prompt tuning after API starts"
+  ]
+}

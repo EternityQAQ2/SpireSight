@@ -87,7 +87,7 @@ class ModelRuntimeTests(unittest.TestCase):
             self.skipTest("MPS not available on this host")
         self.check_generation("auto", "mps")
 
-    def test_real_invalid_model_output_falls_back_to_legal_rule_advice(self):
+    def test_real_invalid_combat_output_stops_without_rule_replacement(self):
         raw = json.loads((Path(__file__).parent / "fixtures/combat_state.json").read_text(encoding="utf-8"))
 
         class Client:
@@ -100,10 +100,10 @@ class ModelRuntimeTests(unittest.TestCase):
             Client(), NullRetriever(), backend, SessionRecorder(self.path, enabled=False),
             backend_name="transformers", fallback_backend=RuleAdvisor(), output=output.append,
         )
-        self.assertTrue(service.run_once())
-        self.assertIn("改用规则后端", output[0])
-        self.assertIn("防御", output[1])
-        self.assertFalse(service.run_once())
+        with self.assertRaisesRegex(ValueError, '模型未返回 JSON'):
+            service.run_once()
+        self.assertFalse(any('改用规则后端' in line for line in output))
+        self.assertIsNone(service.last_decision_id)
 
 
 if __name__ == "__main__":
